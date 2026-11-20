@@ -578,4 +578,4 @@ class FloatingNoteWindow(QWidget):
         else:
             self.editor.setPlainText(note.get("content", ""))
 
-        self.editor.textChanged.
+        self.editor.textChanged.connect(self.on_note_edited)
