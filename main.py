@@ -4,6 +4,8 @@ import os
 import threading
 import time
 import winsound
+import zipfile
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw
 import qtawesome as qta
@@ -21,7 +23,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QFontComboBox, QColorDialog, QDialog, QFormLayout, QStatusBar
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QSize
-from PyQt6.QtGui import QFont, QIcon, QTextCharFormat, QColor, QTextListFormat
+from PyQt6.QtGui import QFont, QIcon, QTextCharFormat, QTextListFormat
 
 DATA_FILE = "notes_hamza_data.json"
 ICON_FILE = "icon.ico"
@@ -41,6 +43,8 @@ TRANSLATIONS = {
         "sync_keep": "مزامنة Google Keep",
         "syncing": "جاري المزامنة...",
         "keep_settings": "إعدادات Keep",
+        "open_file": "فتح ملف",
+        "open_file_tip": "فتح ملف (.txt, .eml, .msg, .docx)",
         "export_note": "تصدير الملاحظة",
         "keep_not_synced": "لم تتم المزامنة بعد",
         "keep_prefix": "Keep:",
@@ -103,6 +107,8 @@ TRANSLATIONS = {
         "status_selected_all": "تم تحديد نص الملاحظة بالكامل",
         "status_nothing_to_copy": "لا يوجد محتوى لنسخه",
         "status_copied_all": "تم نسخ الملاحظة كاملة إلى الحافظة",
+        "status_file_opened": "تم فتح الملف: {name}",
+        "status_file_open_fail": "تعذر فتح الملف: {err}",
         "enter_password_title": "ملاحظة مقفلة",
         "enter_password_prompt": "أدخل كلمة المرور:",
         "wrong_password": "كلمة المرور غير صحيحة",
@@ -148,6 +154,8 @@ TRANSLATIONS = {
         "sync_keep": "Sync Google Keep",
         "syncing": "Syncing...",
         "keep_settings": "Keep Settings",
+        "open_file": "Open File",
+        "open_file_tip": "Open file (.txt, .eml, .msg, .docx)",
         "export_note": "Export Note",
         "keep_not_synced": "Not synced yet",
         "keep_prefix": "Keep:",
@@ -210,6 +218,8 @@ TRANSLATIONS = {
         "status_selected_all": "Selected entire note text",
         "status_nothing_to_copy": "Nothing to copy",
         "status_copied_all": "Copied full note to clipboard",
+        "status_file_opened": "Opened file: {name}",
+        "status_file_open_fail": "Failed to open file: {err}",
         "enter_password_title": "Locked Note",
         "enter_password_prompt": "Enter password:",
         "wrong_password": "Incorrect password",
@@ -709,7 +719,6 @@ class NotesHamzaStudio(QMainWindow):
         brand_box.addWidget(sub_lbl)
         side_lay.addLayout(brand_box)
 
-        # مبدل اللغة (العربية / English)
         lang_row = QHBoxLayout()
         lang_row.setSpacing(6)
         lang_lbl = QLabel(self.tr("lang_label"))
@@ -757,6 +766,14 @@ class NotesHamzaStudio(QMainWindow):
             self.nav_buttons[key] = btn
 
         side_lay.addStretch()
+
+        open_file_btn = QPushButton(f" {self.tr('open_file')}")
+        open_file_btn.setIcon(qta.icon("fa5s.folder-open", color="#34D399"))
+        open_file_btn.setToolTip(self.tr("open_file_tip"))
+        open_file_btn.setProperty("class", "NavItem")
+        open_file_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_file_btn.clicked.connect(self.open_external_file)
+        side_lay.addWidget(open_file_btn)
 
         self.sync_btn = QPushButton(f" {self.tr('sync_keep')}")
         self.sync_btn.setIcon(qta.icon("fa5s.sync", color="#38BDF8"))
@@ -988,6 +1005,107 @@ class NotesHamzaStudio(QMainWindow):
         self.rem_input.setText(target_time)
         self.set_status(self.tr("status_reminder_set", time=target_time), 2500)
 
+    # ================= External Files (.txt, .eml, .msg, .docx) =================
+    def _extract_docx_text(self, file_path):
+        paragraphs = []
+        with zipfile.ZipFile(file_path, "r") as zf:
+            if "word/document.xml" not in zf.namelist():
+                raise ValueError("Invalid DOCX structure")
+            xml_content = zf.read("word/document.xml")
+
+        root = ET.fromstring(xml_content)
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        for p in root.findall(".//w:p", ns):
+            texts = [t.text for t in p.findall(".//w:t", ns) if t.text]
+            if texts:
+                paragraphs.append("".join(texts))
+        return "\n".join(paragraphs)
+
+    def _extract_msg_text(self, file_path):
+        try:
+            import extract_msg
+            msg = extract_msg.Message(file_path)
+            parts = []
+            if msg.subject:
+                parts.append(f"Subject: {msg.subject}")
+            if msg.sender:
+                parts.append(f"From: {msg.sender}")
+            if msg.date:
+                parts.append(f"Date: {msg.date}")
+            if msg.body:
+                parts.append("\n" + msg.body)
+            return "\n".join(parts).strip()
+        except Exception:
+            with open(file_path, "rb") as f:
+                raw = f.read()
+            decoded_utf16 = raw.decode("utf-16-le", errors="ignore")
+            lines = [
+                line.strip()
+                for line in decoded_utf16.splitlines()
+                if len(line.strip()) >= 4 and any(ch.isalnum() for ch in line)
+            ]
+            if lines:
+                return "\n".join(lines[:120])
+            return raw.decode("utf-8", errors="ignore")
+
+    def open_external_file(self):
+        file_filter = (
+            "Supported Files (*.txt *.eml *.msg *.docx);;"
+            "Text & Outlook Mail (*.txt *.eml *.msg);;"
+            "Word Document (*.docx);;"
+            "All Files (*.*)"
+        )
+        path, _ = QFileDialog.getOpenFileName(self, self.tr("open_file_tip"), "", file_filter)
+        if not path:
+            return
+
+        try:
+            ext = os.path.splitext(path)[1].lower()
+            if ext == ".docx":
+                content = self._extract_docx_text(path)
+            elif ext == ".msg":
+                content = self._extract_msg_text(path)
+            else:
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                except UnicodeDecodeError:
+                    with open(path, "r", encoding="cp1256", errors="replace") as f:
+                        content = f.read()
+
+            base_name = os.path.splitext(os.path.basename(path))[0]
+            note = self.get_current_note()
+            if note and not (self.editor.toPlainText().strip() or self.title_edit.text().strip()):
+                note["title"] = base_name
+                note["content"] = content
+                note["html"] = ""
+                note["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                self.save_data()
+                self.load_note(note["id"])
+            else:
+                nid = str(int(datetime.now().timestamp() * 1000))
+                cat = self.current_category if self.current_category not in ["All", "Pinned", "Locked"] else "Projects"
+                default_theme = next(iter(get_page_themes(self.lang).keys()))
+                self.data["notes"].insert(0, {
+                    "id": nid,
+                    "keep_id": "",
+                    "title": base_name,
+                    "category": cat,
+                    "content": content,
+                    "html": "",
+                    "theme": default_theme,
+                    "pinned": False,
+                    "password": "",
+                    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "tasks": []
+                })
+                self.save_data()
+                self.load_note(nid)
+
+            self.set_status(self.tr("status_file_opened", name=os.path.basename(path)), 4000)
+        except Exception as e:
+            self.set_status(self.tr("status_file_open_fail", err=e), 5000)
+
     # ================= Google Keep Sync =================
     def open_keep_settings(self):
         dlg = KeepSettingsDialog(self.data.get("keep", {}), self.lang, self)
@@ -1185,305 +1303,4 @@ class NotesHamzaStudio(QMainWindow):
     # ================= Notes CRUD =================
     def set_category(self, cat):
         self.current_category = cat
-        for k, btn in self.nav_buttons.items():
-            btn.setProperty("active", "true" if k == cat else "false")
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
-        self.refresh_notes_list()
-
-    def get_current_note(self):
-        return next((n for n in self.data["notes"] if n["id"] == self.current_note_id), None)
-
-    def refresh_notes_list(self):
-        self.notes_list.clear()
-        q = self.search_box.text().strip().lower()
-        filtered = []
-
-        for n in self.data["notes"]:
-            locked = bool(n.get("password"))
-            if self.current_category == "Pinned" and not n.get("pinned"):
-                continue
-            if self.current_category == "Locked" and not locked:
-                continue
-            if self.current_category not in ["All", "Pinned", "Locked"] and n.get("category") != self.current_category:
-                continue
-            if q and q not in n["title"].lower() and (locked or q not in n["content"].lower()):
-                continue
-            filtered.append(n)
-
-        filtered.sort(key=lambda x: x.get("pinned", False), reverse=True)
-
-        for n in filtered:
-            title = (n["title"] or self.tr("untitled")).strip()
-            if n.get("password"):
-                snippet = self.tr("locked_note_snippet")
-            else:
-                one_line = " ".join((n.get("content") or "").split())
-                snippet = (one_line[:52] + "...") if len(one_line) > 52 else (one_line or self.tr("no_content"))
-
-            sync_tag = f"  •  {self.tr('keep_tag')}" if n.get("keep_id") else ""
-            item_text = f"{title}\n{snippet}\n{n['category']}  •  {n['updated_at']}{sync_tag}"
-
-            item = QListWidgetItem(item_text)
-            if n.get("password"):
-                item.setIcon(qta.icon("fa5s.lock", color="#EF4444"))
-            elif n.get("pinned"):
-                item.setIcon(qta.icon("fa5s.thumbtack", color="#F59E0B"))
-            else:
-                item.setIcon(qta.icon("fa5s.file-alt", color="#818CF8"))
-
-            item.setData(Qt.ItemDataRole.UserRole, n["id"])
-            self.notes_list.addItem(item)
-            if n["id"] == self.current_note_id:
-                item.setSelected(True)
-
-        if not self.current_note_id and filtered:
-            self.load_note(filtered[0]["id"])
-
-    def on_note_clicked(self, item):
-        self.load_note(item.data(Qt.ItemDataRole.UserRole))
-
-    def load_note(self, note_id):
-        note = next((n for n in self.data["notes"] if n["id"] == note_id), None)
-        if not note:
-            return
-
-        if note.get("password") and note_id not in self.unlocked_notes:
-            pwd, ok = QInputDialog.getText(
-                self, self.tr("enter_password_title"), self.tr("enter_password_prompt"), QLineEdit.EchoMode.Password
-            )
-            if not ok or pwd != note["password"]:
-                if ok:
-                    self.set_status(self.tr("wrong_password"), 3500)
-                return
-            self.unlocked_notes.add(note_id)
-
-        self.current_note_id = note_id
-        self.title_edit.blockSignals(True)
-        self.editor.blockSignals(True)
-        self.theme_combo.blockSignals(True)
-
-        self.title_edit.setText(note["title"])
-        themes = get_page_themes(self.lang)
-        theme_name = note.get("theme") if note.get("theme") in themes else next(iter(themes.keys()))
-        self.theme_combo.setCurrentText(theme_name)
-        self.apply_editor_theme(theme_name)
-
-        if note.get("html"):
-            self.editor.setHtml(note["html"])
-        else:
-            self.editor.setPlainText(note.get("content", ""))
-
-        self.cat_combo.setCurrentText(note.get("category", "Projects"))
-        self.lock_btn.setText(f" {self.tr('locked')}" if note.get("password") else f" {self.tr('lock')}")
-        self.lock_btn.setIcon(
-            qta.icon("fa5s.lock" if note.get("password") else "fa5s.unlock", color="#F59E0B" if note.get("password") else "#CBD5E1")
-        )
-        self.pin_btn.setIcon(qta.icon("fa5s.thumbtack", color="#6366F1" if note.get("pinned") else "#CBD5E1"))
-
-        self.title_edit.blockSignals(False)
-        self.editor.blockSignals(False)
-        self.theme_combo.blockSignals(False)
-
-        self.update_stats()
-        self.refresh_tasks()
-        self.refresh_notes_list()
-
-    def create_note(self):
-        nid = str(int(datetime.now().timestamp() * 1000))
-        cat = self.current_category if self.current_category not in ["All", "Pinned", "Locked"] else "Projects"
-        default_theme = next(iter(get_page_themes(self.lang).keys()))
-        self.data["notes"].insert(0, {
-            "id": nid, "keep_id": "", "title": self.tr("new_note"), "category": cat,
-            "content": "", "html": "", "theme": default_theme,
-            "pinned": False, "password": "",
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "tasks": []
-        })
-        self.save_data()
-        self.load_note(nid)
-        self.set_status(self.tr("status_note_created"), 2500)
-
-    def auto_save(self):
-        note = self.get_current_note()
-        if not note:
-            return
-        note["title"] = self.title_edit.text()
-        note["content"] = self.editor.toPlainText()
-        note["html"] = self.editor.toHtml()
-        note["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        self.update_stats()
-        self.save_data()
-        self.set_status(self.tr("status_auto_saved"), 1500)
-
-    def update_stats(self):
-        txt = self.editor.toPlainText()
-        self.stats_lbl.setText(self.tr("stats", words=len(txt.split()), chars=len(txt)))
-
-    def change_category(self, cat):
-        note = self.get_current_note()
-        if note:
-            note["category"] = cat
-            self.save_data()
-            self.refresh_notes_list()
-
-    def toggle_pin(self):
-        note = self.get_current_note()
-        if note:
-            note["pinned"] = not note.get("pinned", False)
-            self.save_data()
-            self.load_note(note["id"])
-            self.set_status(self.tr("status_pin_updated"), 2000)
-
-    def toggle_lock(self):
-        note = self.get_current_note()
-        if not note:
-            return
-        if note.get("password"):
-            if QMessageBox.question(self, self.tr("unlock_title"), self.tr("unlock_prompt")) == QMessageBox.StandardButton.Yes:
-                note["password"] = ""
-                self.save_data()
-                self.load_note(note["id"])
-                self.set_status(self.tr("status_unlocked"), 2500)
-        else:
-            pwd, ok = QInputDialog.getText(
-                self, self.tr("lock_title"), self.tr("lock_prompt"), QLineEdit.EchoMode.Password
-            )
-            if ok and pwd.strip():
-                note["password"] = pwd.strip()
-                self.unlocked_notes.add(note["id"])
-                self.save_data()
-                self.load_note(note["id"])
-                self.set_status(self.tr("status_locked"), 2500)
-
-    def delete_note(self):
-        if not self.current_note_id:
-            return
-        if QMessageBox.question(self, self.tr("delete_title"), self.tr("delete_prompt")) == QMessageBox.StandardButton.Yes:
-            self.data["notes"] = [n for n in self.data["notes"] if n["id"] != self.current_note_id]
-            self.current_note_id = None
-            self.title_edit.clear()
-            self.editor.clear()
-            self.save_data()
-            self.refresh_notes_list()
-            self.refresh_tasks()
-            self.set_status(self.tr("status_deleted"), 2500)
-
-    def export_note(self):
-        note = self.get_current_note()
-        if not note:
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, self.tr("export_title"), f"{note['title']}.md", "Markdown (*.md);;HTML (*.html);;Text (*.txt)"
-        )
-        if path:
-            with open(path, "w", encoding="utf-8") as f:
-                if path.endswith(".html"):
-                    f.write(note.get("html") or note.get("content", ""))
-                else:
-                    f.write(f"# {note['title']}\n\n{note['content']}\n")
-            self.set_status(self.tr("status_exported", name=os.path.basename(path)), 4000)
-
-    # ================= Tasks & Reminders =================
-    def add_task(self):
-        note = self.get_current_note()
-        txt = self.task_input.text().strip()
-        rem = self.rem_input.text().strip()
-        if not note or not txt:
-            return
-        if rem:
-            try:
-                datetime.strptime(rem, "%H:%M")
-            except ValueError:
-                self.set_status(self.tr("status_bad_time"), 4000)
-                return
-        note.setdefault("tasks", []).append({
-            "text": txt, "done": False, "priority": self.prio_combo.currentText(),
-            "reminder": rem, "alerted": False
-        })
-        self.task_input.clear()
-        self.rem_input.clear()
-        self.save_data()
-        self.refresh_tasks()
-        self.set_status(self.tr("status_task_added"), 2000)
-
-    def refresh_tasks(self):
-        while self.tasks_list_lay.count():
-            ch = self.tasks_list_lay.takeAt(0)
-            if ch.widget():
-                ch.widget().deleteLater()
-
-        note = self.get_current_note()
-        tasks = note.get("tasks", []) if note else []
-        p_colors = {"High": "#F87171", "Medium": "#FBBF24", "Low": "#34D399"}
-
-        for idx, t in enumerate(tasks):
-            card = QFrame()
-            card.setProperty("class", "TaskRowCard")
-            lay = QHBoxLayout(card)
-            lay.setContentsMargins(9, 6, 9, 6)
-
-            rem_txt = f" [{t['reminder']}]" if t.get("reminder") else ""
-            cb = QCheckBox(f"{t['text']}{rem_txt}")
-            cb.setChecked(t["done"])
-            cb.stateChanged.connect(lambda state, i=idx: self.toggle_task(i))
-            lay.addWidget(cb, 1)
-
-            prio = QLabel(t["priority"])
-            prio.setStyleSheet(f"color: {p_colors.get(t['priority'], '#CBD5E1')}; font-size: 11px; font-weight: 700;")
-            lay.addWidget(prio)
-
-            rm_btn = QPushButton()
-            rm_btn.setIcon(qta.icon("fa5s.times", color="#94A3B8"))
-            rm_btn.setStyleSheet("border: none; background: transparent;")
-            rm_btn.clicked.connect(lambda checked, i=idx: self.delete_task(i))
-            lay.addWidget(rm_btn)
-
-            self.tasks_list_lay.addWidget(card)
-
-        if tasks:
-            done = sum(1 for t in tasks if t["done"])
-            pct = int((done / len(tasks)) * 100)
-            self.prog_bar.setValue(pct)
-            self.prog_lbl.setText(self.tr("progress", pct=pct, done=done, total=len(tasks)))
-        else:
-            self.prog_bar.setValue(0)
-            self.prog_lbl.setText(self.tr("progress_zero"))
-
-    def toggle_task(self, idx):
-        note = self.get_current_note()
-        if note:
-            note["tasks"][idx]["done"] = not note["tasks"][idx]["done"]
-            self.save_data()
-            self.refresh_tasks()
-
-    def delete_task(self, idx):
-        note = self.get_current_note()
-        if note:
-            note["tasks"].pop(idx)
-            self.save_data()
-            self.refresh_tasks()
-
-    def reminder_worker(self):
-        while True:
-            now = datetime.now().strftime("%H:%M")
-            for note in self.data.get("notes", []):
-                for t in note.get("tasks", []):
-                    if not t.get("done") and t.get("reminder") == now and not t.get("alerted"):
-                        t["alerted"] = True
-                        self.save_data()
-                        self.signaler.alarm_triggered.emit(t["text"], note["title"])
-            time.sleep(10)
-
-    def show_alarm_popup(self, task_text, note_title):
-        try:
-            winsound.Beep(1000, 500)
-        except Exception:
-            pass
-        QMessageBox.information(self, self.tr("alarm_title"), self.tr("alarm_body", task=task_text, note=note_title))
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    win = NotesHamzaStudio()
-    win.show()
-    sys.exit(app.exec())
+        for k, btn in self.nav_buttons.
