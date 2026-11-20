@@ -22,12 +22,50 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build EXE with PyInstaller
+      - name: Build App with PyInstaller
         run: |
-          pyinstaller --noconfirm --onefile --windowed --clean --collect-all qtawesome --collect-all PyQt6 --name "NotesHamza" main.py
+          pyinstaller --noconfirm --onedir --clean --collect-all qtawesome --collect-all PyQt6 --name "NotesHamza" main.py
 
-      - name: Upload EXE artifact
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+
+      - name: Create Inno Setup script and Build Installer
+        shell: pwsh
+        run: |
+          $iss = @"
+          [Setup]
+          AppName=Notes Hamza Studio
+          AppVersion=1.0
+          DefaultDirName={autopf}\Notes Hamza Studio
+          DefaultGroupName=Notes Hamza Studio
+          OutputDir=installer
+          OutputBaseFilename=NotesHamza_Setup
+          Compression=lzma2
+          SolidCompression=yes
+          PrivilegesRequired=lowest
+
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+
+          [Files]
+          Source: "dist\NotesHamza\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\Notes Hamza Studio"; Filename: "{app}\NotesHamza.exe"
+          Name: "{autodesktop}\Notes Hamza Studio"; Filename: "{app}\NotesHamza.exe"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\NotesHamza.exe"; Description: "{cm:LaunchProgram,Notes Hamza Studio}"; Flags: nowait postinstall skipifsilent
+          "@
+          Set-Content -Path "setup.iss" -Value $iss -Encoding UTF8
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "setup.iss"
+
+      - name: Upload Installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NotesHamza-Windows
-          path: dist/NotesHamza.exe
+          name: NotesHamza-Setup
+          path: installer/NotesHamza_Setup.exe
