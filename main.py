@@ -327,4 +327,4 @@ class NotesHamzaPro(QMainWindow):
             ("المشاريع", "Projects", "fa5s.rocket", "#A78BFA"),
             ("شخصي", "Personal", "fa5s.user", "#34D399"),
             ("العمل", "Work", "fa5s.briefcase", "#38BDF8"),
-            ("أفكار
+            ("أفكار", "Ideas", "fa5s.lightbulb", "#FBBF24")
