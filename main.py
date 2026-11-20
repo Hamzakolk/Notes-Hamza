@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTextEdit, QListWidget, QListWidgetItem,
     QComboBox, QProgressBar, QFrame, QMessageBox, QInputDialog, QFileDialog,
-    QCheckBox, QFontComboBox, QColorDialog, QSpinBox
+    QCheckBox, QFontComboBox, QColorDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QSize
 from PyQt6.QtGui import QFont, QIcon, QTextCharFormat, QColor, QTextListFormat
@@ -24,14 +24,23 @@ def generate_app_icon():
     if not os.path.exists(ICON_FILE):
         img = Image.new("RGBA", (256, 256), (15, 23, 42, 255))
         draw = ImageDraw.Draw(img)
-        draw.rounded_rectangle([16, 16, 240, 240], radius=50, fill=(59, 130, 246, 255))
-        draw.rounded_rectangle([60, 70, 196, 92], radius=8, fill=(255, 255, 255, 255))
-        draw.rounded_rectangle([60, 118, 170, 140], radius=8, fill=(255, 255, 255, 255))
-        draw.rounded_rectangle([60, 166, 140, 188], radius=8, fill=(147, 197, 253, 255))
+        draw.rounded_rectangle([20, 20, 236, 236], radius=50, fill=(59, 130, 246, 255))
+        draw.rounded_rectangle([65, 70, 191, 88], radius=8, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle([65, 118, 191, 136], radius=8, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle([65, 166, 145, 184], radius=8, fill=(147, 197, 253, 255))
         img.save(ICON_FILE, format="ICO", sizes=[(256, 256), (64, 64), (32, 32)])
 
+PAGE_THEMES = {
+    "افتراضي (ليلي داكن)": {"bg": "#111827", "fg": "#F8FAFC"},
+    "أزرق ليلي عميق": {"bg": "#0F172A", "fg": "#E2E8F0"},
+    "أخضر زمردي داكن": {"bg": "#062C22", "fg": "#ECFDF5"},
+    "بنفسجي ملكي داكن": {"bg": "#1E1035", "fg": "#F3E8FF"},
+    "ورقة صفراء دافئة": {"bg": "#FEF9C3", "fg": "#1E293B"},
+    "ورقة بيضاء كلاسيكية": {"bg": "#FFFFFF", "fg": "#0F172A"}
+}
+
 STYLESHEET = """
-QMainWindow, QWidget#FloatingWin {
+QMainWindow {
     background-color: #0B0F19;
 }
 QWidget {
@@ -63,7 +72,7 @@ QWidget {
 .NavBtn {
     background-color: transparent;
     text-align: right;
-    padding: 10px 14px;
+    padding: 10px 15px;
     border-radius: 8px;
     color: #9CA3AF;
     font-weight: 600;
@@ -138,11 +147,11 @@ QListWidget::item:selected {
     background-color: #1F2937;
     color: #FFFFFF;
 }
-QComboBox, QFontComboBox, QSpinBox {
+QComboBox, QFontComboBox {
     background-color: #1E293B;
     border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 4px 8px;
+    border-radius: 8px;
+    padding: 6px 10px;
     color: white;
 }
 #TodoPanel {
@@ -173,96 +182,56 @@ QLineEdit {
 }
 """
 
-NOTE_PAGE_THEMES = {
-    "داكن افتراضي": ("#111827", "#F8FAFC"),
-    "أزرق ليلي": ("#0F2942", "#F0F9FF"),
-    "أخضر زمردي": ("#063729", "#ECFDF5"),
-    "بنفسجي هادئ": ("#24163D", "#F5F3FF"),
-    "بني دافئ": ("#2C1E16", "#FFFBEB"),
-    "ورقة صفراء": ("#FEF9C3", "#1E293B"),
-    "ورقة بيضاء": ("#FFFFFF", "#0F172A"),
-}
-
 class AlarmSignaler(QObject):
     triggered = pyqtSignal(str, str)
 
-
 class FloatingNoteWindow(QWidget):
-    """نافذة طائرة مستقلة لفتح الملاحظة خارج البرنامج الرئيسي"""
-    def __init__(self, note_data, save_callback, refresh_main_callback):
+    def __init__(self, note, parent_app):
         super().__init__()
-        self.note = note_data
-        self.save_callback = save_callback
-        self.refresh_main_callback = refresh_main_callback
-
-        self.setObjectName("FloatingWin")
-        self.setWindowTitle(f"📌 {self.note['title']} - نافذة مستقلة")
-        self.resize(620, 520)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.note = note
+        self.parent_app = parent_app
+        self.setWindowTitle(f"📌 {note.get('title', 'ملاحظة طائرة')} - Notes Hamza")
+        self.resize(520, 480)
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(14, 14, 14, 14)
 
-        top_bar = QHBoxLayout()
-        self.title_edit = QLineEdit(self.note["title"])
-        self.title_edit.setStyleSheet("font-size: 18px; font-weight: bold; background: #1E293B; border: none;")
-        self.title_edit.textEdited.connect(self.on_change)
-        top_bar.addWidget(self.title_edit)
+        self.title_lbl = QLabel(note.get("title", "بدون عنوان"))
+        self.title_lbl.setStyleSheet("font-size: 18px; font-weight: bold; color: #3B82F6;")
+        layout.addWidget(self.title_lbl)
 
-        self.pin_top_btn = QPushButton("مثبت فوق النوافذ")
-        self.pin_top_btn.setCheckable(True)
-        self.pin_top_btn.setChecked(True)
-        self.pin_top_btn.setIcon(qta.icon("fa5s.thumbtack", color="#3B82F6"))
-        self.pin_top_btn.setProperty("class", "ToolBtn")
-        self.pin_top_btn.clicked.connect(self.toggle_on_top)
-        top_bar.addWidget(self.pin_top_btn)
-
-        layout.addLayout(top_bar)
-
-        self.editor = QTextEdit()
-        self.editor.setHtml(self.note.get("html_content") or self.note.get("content", ""))
-        self.apply_page_theme()
-        self.editor.textChanged.connect(self.on_change)
-        layout.addWidget(self.editor)
-
-    def apply_page_theme(self):
-        bg, fg = NOTE_PAGE_THEMES.get(self.note.get("page_theme", "داكن افتراضي"), ("#111827", "#F8FAFC"))
-        self.editor.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: {bg};
-                color: {fg};
-                border: 1px solid #334155;
-                border-radius: 12px;
-                padding: 14px;
-                font-size: 15px;
-            }}
-        """)
-
-    def toggle_on_top(self):
-        flags = self.windowFlags()
-        if self.pin_top_btn.isChecked():
-            self.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
+        self.float_editor = QTextEdit()
+        theme = PAGE_THEMES.get(note.get("theme", "افتراضي (ليلي داكن)"), PAGE_THEMES["افتراضي (ليلي داكن)"])
+        self.float_editor.setStyleSheet(
+            f"background-color: {theme['bg']}; color: {theme['fg']}; border-radius: 10px; padding: 12px; font-size: 15px;"
+        )
+        if note.get("html"):
+            self.float_editor.setHtml(note["html"])
         else:
-            self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
+            self.float_editor.setPlainText(note.get("content", ""))
 
-    def on_change(self):
-        self.note["title"] = self.title_edit.text()
-        self.note["content"] = self.editor.toPlainText()
-        self.note["html_content"] = self.editor.toHtml()
+        self.float_editor.textChanged.connect(self.sync_back)
+        layout.addWidget(self.float_editor)
+
+    def sync_back(self):
+        self.note["content"] = self.float_editor.toPlainText()
+        self.note["html"] = self.float_editor.toHtml()
         self.note["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        self.save_callback()
-        self.refresh_main_callback(self.note["id"])
-
+        self.parent_app.save_data()
+        if self.parent_app.current_note_id == self.note["id"]:
+            self.parent_app.editor.blockSignals(True)
+            self.parent_app.editor.setHtml(self.note["html"])
+            self.parent_app.editor.blockSignals(False)
+            self.parent_app.update_stats()
 
 class NotesHamzaPro(QMainWindow):
     def __init__(self):
         super().__init__()
         generate_app_icon()
-        self.setWindowTitle("Notes Hamza Pro - محرر الملاحظات والمهام المتطور")
-        self.resize(1420, 840)
+        self.setWindowTitle("Notes Hamza Pro - إدارة الملاحظات والمهام")
+        self.resize(1380, 840)
         if os.path.exists(ICON_FILE):
             self.setWindowIcon(QIcon(ICON_FILE))
 
@@ -295,15 +264,19 @@ class NotesHamzaPro(QMainWindow):
                     "id": "1",
                     "title": "مرحباً بك في Notes Hamza Pro",
                     "category": "Projects",
-                    "content": "أهلاً بك في النسخة الاحترافية بالأيقونات الحديثة ومحرر النصوص المتكامل!",
-                    "html_content": "",
-                    "page_theme": "داكن افتراضي",
+                    "content": "تم تحديث البرنامج بأيقونات حديثة ومحرر نصوص متكامل شبيه بـ Word.
+
+• يمكنك تغيير نوع الخط وحجمه ولونه
+• يمكنك تلوين خلفية كل صفحة ملاحظة بشكل مستقل
+• يمكنك فتح أي ملاحظة في تبويب طائر فوق البرامج",
+                    "html": "",
+                    "theme": "افتراضي (ليلي داكن)",
                     "pinned": True,
                     "password": "",
                     "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "tasks": [
-                        {"text": "تجربة شريط أدوات التنسيق (الخط، الحجم، الألوان)", "done": False, "priority": "High", "reminder": ""},
-                        {"text": "فتح ملاحظة في نافذة طائرة مستقلة", "done": False, "priority": "Medium", "reminder": ""}
+                        {"text": "تجربة شريط تنسيق الخطوط والألوان", "done": False, "priority": "High", "reminder": ""},
+                        {"text": "فتح الملاحظة في نافذة طائرة", "done": False, "priority": "Medium", "reminder": ""}
                     ]
                 }
             ]
@@ -328,36 +301,31 @@ class NotesHamzaPro(QMainWindow):
         side_layout.setContentsMargins(16, 20, 16, 20)
         side_layout.setSpacing(8)
 
-        logo_row = QHBoxLayout()
-        logo_icon = QLabel()
-        logo_icon.setPixmap(qta.icon("fa5s.feather-alt", color="#3B82F6").pixmap(24, 24))
-        logo_text = QLabel("Notes Hamza")
-        logo_text.setObjectName("LogoLabel")
-        logo_row.addWidget(logo_icon)
-        logo_row.addWidget(logo_text)
-        logo_row.addStretch()
-        side_layout.addLayout(logo_row)
+        logo = QLabel("  Notes Hamza")
+        logo.setObjectName("LogoLabel")
+        side_layout.addWidget(logo)
 
         new_btn = QPushButton("  ملاحظة جديدة")
-        new_btn.setIcon(qta.icon("fa5s.plus", color="white"))
+        new_btn.setIcon(qta.icon("fa5s.plus-circle", color="white"))
+        new_btn.setIconSize(QSize(18, 18))
         new_btn.setObjectName("NewNoteBtn")
         new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         new_btn.clicked.connect(self.create_note)
         side_layout.addWidget(new_btn)
-        side_layout.addSpacing(12)
+        side_layout.addSpacing(15)
 
         cats = [
-            ("جميع الملاحظات", "All", "fa5s.layer-group", "#60A5FA"),
+            ("جميع الملاحظات", "All", "fa5s.folder-open", "#60A5FA"),
             ("المثبتة بالأعلى", "Pinned", "fa5s.thumbtack", "#F59E0B"),
             ("الملاحظات السرية", "Locked", "fa5s.lock", "#EF4444"),
-            ("المشاريع", "Projects", "fa5s.rocket", "#8B5CF6"),
-            ("شخصي", "Personal", "fa5s.user", "#10B981"),
-            ("العمل", "Work", "fa5s.briefcase", "#3B82F6"),
+            ("المشاريع", "Projects", "fa5s.rocket", "#A78BFA"),
+            ("شخصي", "Personal", "fa5s.user", "#34D399"),
+            ("العمل", "Work", "fa5s.briefcase", "#38BDF8"),
             ("أفكار", "Ideas", "fa5s.lightbulb", "#FBBF24")
         ]
-        for text, key, icon_name, color in cats:
+        for text, key, icon_name, icon_color in cats:
             btn = QPushButton(f"  {text}")
-            btn.setIcon(qta.icon(icon_name, color=color))
+            btn.setIcon(qta.icon(icon_name, color=icon_color))
             btn.setIconSize(QSize(16, 16))
             btn.setProperty("class", "NavBtn")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -376,7 +344,7 @@ class NotesHamzaPro(QMainWindow):
         # ================= 2. قائمة الملاحظات =================
         notes_panel = QFrame()
         notes_panel.setObjectName("NotesPanel")
-        notes_panel.setFixedWidth(285)
+        notes_panel.setFixedWidth(290)
         notes_layout = QVBoxLayout(notes_panel)
         notes_layout.setContentsMargins(14, 20, 14, 14)
         notes_layout.setSpacing(12)
@@ -391,14 +359,14 @@ class NotesHamzaPro(QMainWindow):
         self.notes_list.itemClicked.connect(self.on_note_clicked)
         notes_layout.addWidget(self.notes_list)
 
-        # ================= 3. محرر النصوص المتطور (مثل Word) =================
+        # ================= 3. محرر النصوص المتكامل =================
         editor_panel = QFrame()
         editor_panel.setObjectName("EditorPanel")
         editor_layout = QVBoxLayout(editor_panel)
         editor_layout.setContentsMargins(22, 18, 22, 14)
         editor_layout.setSpacing(10)
 
-        # الشريط العلوي للعنوان والأزرار
+        # الصف العلوي (العنوان + التحكم)
         header_row = QHBoxLayout()
         self.title_input = QLineEdit()
         self.title_input.setObjectName("TitleInput")
@@ -411,13 +379,12 @@ class NotesHamzaPro(QMainWindow):
         self.cat_combo.currentTextChanged.connect(self.change_category)
         header_row.addWidget(self.cat_combo)
 
-        # زر فتح الملاحظة في تبويب طائر خارج البرنامج
-        self.popout_btn = QPushButton(" نافذة طائرة")
-        self.popout_btn.setIcon(qta.icon("fa5s.external-link-alt", color="#38BDF8"))
-        self.popout_btn.setProperty("class", "ToolBtn")
-        self.popout_btn.setToolTip("فتح الملاحظة في نافذة مستقلة عائمة")
-        self.popout_btn.clicked.connect(self.open_floating_window)
-        header_row.addWidget(self.popout_btn)
+        float_btn = QPushButton(" تبويب طائر")
+        float_btn.setIcon(qta.icon("fa5s.external-link-alt", color="#38BDF8"))
+        float_btn.setProperty("class", "ToolBtn")
+        float_btn.setToolTip("فتح الملاحظة في نافذة مستقلة عائمة")
+        float_btn.clicked.connect(self.open_floating_window)
+        header_row.addWidget(float_btn)
 
         self.lock_btn = QPushButton(" قفل")
         self.lock_btn.setIcon(qta.icon("fa5s.unlock", color="#CBD5E1"))
@@ -439,108 +406,79 @@ class NotesHamzaPro(QMainWindow):
 
         editor_layout.addLayout(header_row)
 
-        # شريط تنسيق النصوص الشبيه بـ Word (صفين مدمجين وأنيقين)
+        # شريط أدوات التنسيق الشبيه بـ Word (صفين منظمين)
         format_bar = QFrame()
         format_bar.setObjectName("FormatBar")
-        fmt_layout = QHBoxLayout(format_bar)
-        fmt_layout.setContentsMargins(10, 6, 10, 6)
-        fmt_layout.setSpacing(6)
+        fmt_vbox = QVBoxLayout(format_bar)
+        fmt_vbox.setContentsMargins(10, 8, 10, 8)
+        fmt_vbox.setSpacing(6)
 
-        # اختيار نوع الخط
-        self.font_family_combo = QFontComboBox()
-        self.font_family_combo.setFixedWidth(145)
-        self.font_family_combo.currentFontChanged.connect(lambda f: self.editor.setFontFamily(f.family()))
-        fmt_layout.addWidget(self.font_family_combo)
+        row1 = QHBoxLayout()
+        self.font_family = QFontComboBox()
+        self.font_family.setFixedWidth(160)
+        self.font_family.currentFontChanged.connect(self.change_font_family)
+        row1.addWidget(self.font_family)
 
-        # اختيار حجم الخط
-        self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(8, 72)
-        self.font_size_spin.setValue(14)
-        self.font_size_spin.setFixedWidth(60)
-        self.font_size_spin.valueChanged.connect(lambda s: self.editor.setFontPointSize(float(s)))
-        fmt_layout.addWidget(self.font_size_spin)
+        self.font_size = QComboBox()
+        self.font_size.addItems(["10", "12", "14", "16", "18", "20", "24", "28", "36"])
+        self.font_size.setCurrentText("14")
+        self.font_size.setFixedWidth(65)
+        self.font_size.currentTextChanged.connect(self.change_font_size)
+        row1.addWidget(self.font_size)
 
-        # أزرار Bold, Italic, Underline, Strike
-        btn_bold = QPushButton()
-        btn_bold.setIcon(qta.icon("fa5s.bold", color="#E2E8F0"))
-        btn_bold.setProperty("class", "ToolBtn")
-        btn_bold.setToolTip("عريض (Bold)")
-        btn_bold.clicked.connect(self.format_bold)
-        fmt_layout.addWidget(btn_bold)
+        btn_inc = QPushButton()
+        btn_inc.setIcon(qta.icon("fa5s.search-plus", color="#CBD5E1"))
+        btn_inc.setToolTip("تكبير الخط")
+        btn_inc.setProperty("class", "ToolBtn")
+        btn_inc.clicked.connect(lambda: self.step_font_size(2))
+        row1.addWidget(btn_inc)
 
-        btn_italic = QPushButton()
-        btn_italic.setIcon(qta.icon("fa5s.italic", color="#E2E8F0"))
-        btn_italic.setProperty("class", "ToolBtn")
-        btn_italic.setToolTip("مائل (Italic)")
-        btn_italic.clicked.connect(self.format_italic)
-        fmt_layout.addWidget(btn_italic)
+        btn_dec = QPushButton()
+        btn_dec.setIcon(qta.icon("fa5s.search-minus", color="#CBD5E1"))
+        btn_dec.setToolTip("تصغير الخط")
+        btn_dec.setProperty("class", "ToolBtn")
+        btn_dec.clicked.connect(lambda: self.step_font_size(-2))
+        row1.addWidget(btn_dec)
 
-        btn_under = QPushButton()
-        btn_under.setIcon(qta.icon("fa5s.underline", color="#E2E8F0"))
-        btn_under.setProperty("class", "ToolBtn")
-        btn_under.setToolTip("تحته خط (Underline)")
-        btn_under.clicked.connect(self.format_underline)
-        fmt_layout.addWidget(btn_under)
+        row1.addWidget(QLabel(" | "))
 
-        btn_strike = QPushButton()
-        btn_strike.setIcon(qta.icon("fa5s.strikethrough", color="#E2E8F0"))
-        btn_strike.setProperty("class", "ToolBtn")
-        btn_strike.setToolTip("يتوسطه خط")
-        btn_strike.clicked.connect(self.format_strike)
-        fmt_layout.addWidget(btn_strike)
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems(list(PAGE_THEMES.keys()))
+        self.theme_combo.setToolTip("لون صفحة الملاحظة")
+        self.theme_combo.currentTextChanged.connect(self.change_page_theme)
+        row1.addWidget(self.theme_combo)
+        row1.addStretch()
 
-        # لون الخط ولون التظليل
-        btn_txt_color = QPushButton()
-        btn_txt_color.setIcon(qta.icon("fa5s.font", color="#38BDF8"))
-        btn_txt_color.setProperty("class", "ToolBtn")
-        btn_txt_color.setToolTip("تغيير لون الخط")
-        btn_txt_color.clicked.connect(self.pick_text_color)
-        fmt_layout.addWidget(btn_txt_color)
+        row2 = QHBoxLayout()
+        tools = [
+            ("fa5s.bold", "عريض (Bold)", self.format_bold),
+            ("fa5s.italic", "مائل (Italic)", self.format_italic),
+            ("fa5s.underline", "تسطير (Underline)", self.format_underline),
+            ("fa5s.strikethrough", "يتوسطه خط", self.format_strike),
+            ("fa5s.palette", "لون النص", self.pick_text_color),
+            ("fa5s.highlighter", "تظليل النص", self.pick_highlight_color),
+            ("fa5s.align-right", "محاذاة لليمين", lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignRight)),
+            ("fa5s.align-center", "توسيط", lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter)),
+            ("fa5s.align-left", "محاذاة لليسار", lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignLeft)),
+            ("fa5s.list-ul", "قائمة نقطية", self.insert_bullet_list),
+            ("fa5s.clock", "إدراج الوقت", lambda: self.editor.insertPlainText(datetime.now().strftime("%Y-%m-%d %H:%M ")))
+        ]
+        for ic, tip, fn in tools:
+            b = QPushButton()
+            b.setIcon(qta.icon(ic, color="#E2E8F0"))
+            b.setToolTip(tip)
+            b.setProperty("class", "ToolBtn")
+            b.clicked.connect(fn)
+            row2.addWidget(b)
+        row2.addStretch()
 
-        btn_highlight = QPushButton()
-        btn_highlight.setIcon(qta.icon("fa5s.highlighter", color="#FACC15"))
-        btn_highlight.setProperty("class", "ToolBtn")
-        btn_highlight.setToolTip("تمييز / تظليل النص")
-        btn_highlight.clicked.connect(self.pick_highlight_color)
-        fmt_layout.addWidget(btn_highlight)
-
-        # محاذاة وقوائم
-        btn_align_r = QPushButton()
-        btn_align_r.setIcon(qta.icon("fa5s.align-right", color="#E2E8F0"))
-        btn_align_r.setProperty("class", "ToolBtn")
-        btn_align_r.clicked.connect(lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignRight))
-        fmt_layout.addWidget(btn_align_r)
-
-        btn_align_c = QPushButton()
-        btn_align_c.setIcon(qta.icon("fa5s.align-center", color="#E2E8F0"))
-        btn_align_c.setProperty("class", "ToolBtn")
-        btn_align_c.clicked.connect(lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter))
-        fmt_layout.addWidget(btn_align_c)
-
-        btn_list = QPushButton()
-        btn_list.setIcon(qta.icon("fa5s.list-ul", color="#E2E8F0"))
-        btn_list.setProperty("class", "ToolBtn")
-        btn_list.setToolTip("قائمة نقطية")
-        btn_list.clicked.connect(self.insert_bullet_list)
-        fmt_layout.addWidget(btn_list)
-
-        fmt_layout.addStretch()
-
-        # اختيار لون خلفية الصفحة لكل ملاحظة
-        page_lbl = QLabel("لون الصفحة:")
-        page_lbl.setStyleSheet("font-size: 12px; color: #94A3B8;")
-        fmt_layout.addWidget(page_lbl)
-
-        self.page_theme_combo = QComboBox()
-        self.page_theme_combo.addItems(list(NOTE_PAGE_THEMES.keys()))
-        self.page_theme_combo.currentTextChanged.connect(self.change_page_theme)
-        fmt_layout.addWidget(self.page_theme_combo)
-
+        fmt_vbox.addLayout(row1)
+        fmt_vbox.addLayout(row2)
         editor_layout.addWidget(format_bar)
 
         self.editor = QTextEdit()
         self.editor.setObjectName("ContentEditor")
-        self.editor.setPlaceholderText("ابدأ بكتابة أفكارك وملاحظاتك المنسقة هنا...")
+        self.editor.setPlaceholderText("ابدأ بكتابة أفكارك وملاحظاتك هنا...")
         self.editor.textChanged.connect(self.auto_save)
         editor_layout.addWidget(self.editor)
 
@@ -551,20 +489,14 @@ class NotesHamzaPro(QMainWindow):
         # ================= 4. لوحة المهام الذكية =================
         todo_panel = QFrame()
         todo_panel.setObjectName("TodoPanel")
-        todo_panel.setFixedWidth(335)
+        todo_panel.setFixedWidth(340)
         todo_layout = QVBoxLayout(todo_panel)
         todo_layout.setContentsMargins(18, 20, 18, 18)
         todo_layout.setSpacing(12)
 
-        todo_header = QHBoxLayout()
-        t_icon = QLabel()
-        t_icon.setPixmap(qta.icon("fa5s.check-circle", color="#10B981").pixmap(20, 20))
-        todo_title = QLabel("قائمة المهام والتنبيهات")
+        todo_title = QLabel("  قائمة المهام والتنبيهات")
         todo_title.setStyleSheet("font-size: 17px; font-weight: bold;")
-        todo_header.addWidget(t_icon)
-        todo_header.addWidget(todo_title)
-        todo_header.addStretch()
-        todo_layout.addLayout(todo_header)
+        todo_layout.addWidget(todo_title)
 
         self.progress_text = QLabel("نسبة الإنجاز: 0%")
         self.progress_text.setStyleSheet("color: #94A3B8; font-size: 13px;")
@@ -591,7 +523,7 @@ class NotesHamzaPro(QMainWindow):
 
         add_task_btn = QPushButton(" إضافة")
         add_task_btn.setIcon(qta.icon("fa5s.plus", color="white"))
-        add_task_btn.setStyleSheet("background-color: #2563EB; border-radius: 8px; padding: 8px 12px; font-weight: bold;")
+        add_task_btn.setStyleSheet("background-color: #2563EB; border-radius: 8px; padding: 8px 14px; font-weight: bold;")
         add_task_btn.clicked.connect(self.add_task)
         task_controls.addWidget(add_task_btn)
         todo_layout.addLayout(task_controls)
@@ -608,7 +540,26 @@ class NotesHamzaPro(QMainWindow):
 
         self.set_category("All")
 
-    # ================= وظائف التنسيق المتقدمة (Word-Like) =================
+    # ================= أدوات تنسيق المحرر =================
+    def change_font_family(self, font):
+        fmt = QTextCharFormat()
+        fmt.setFontFamily(font.family())
+        self.editor.mergeCurrentCharFormat(fmt)
+
+    def change_font_size(self, size_str):
+        if size_str.isdigit():
+            fmt = QTextCharFormat()
+            fmt.setFontPointSize(float(size_str))
+            self.editor.mergeCurrentCharFormat(fmt)
+
+    def step_font_size(self, delta):
+        curr = int(self.font_size.currentText())
+        new_sz = max(8, min(72, curr + delta))
+        self.font_size.setCurrentText(str(new_sz))
+        fmt = QTextCharFormat()
+        fmt.setFontPointSize(float(new_sz))
+        self.editor.mergeCurrentCharFormat(fmt)
+
     def format_bold(self):
         fmt = QTextCharFormat()
         fmt.setFontWeight(QFont.Weight.Bold if self.editor.fontWeight() != QFont.Weight.Bold else QFont.Weight.Normal)
@@ -626,12 +577,12 @@ class NotesHamzaPro(QMainWindow):
         self.editor.mergeCurrentCharFormat(fmt)
 
     def pick_text_color(self):
-        color = QColorDialog.getColor(parent=self, title="اختر لون الخط")
+        color = QColorDialog.getColor()
         if color.isValid():
             self.editor.setTextColor(color)
 
     def pick_highlight_color(self):
-        color = QColorDialog.getColor(parent=self, title="اختر لون تظليل النص")
+        color = QColorDialog.getColor()
         if color.isValid():
             self.editor.setTextBackgroundColor(color)
 
@@ -639,50 +590,29 @@ class NotesHamzaPro(QMainWindow):
         cursor = self.editor.textCursor()
         cursor.insertList(QTextListFormat.Style.ListDisc)
 
+    def apply_editor_theme(self, theme_name):
+        theme = PAGE_THEMES.get(theme_name, PAGE_THEMES["افتراضي (ليلي داكن)"])
+        self.editor.setStyleSheet(
+            f"background-color: {theme['bg']}; color: {theme['fg']}; "
+            f"border: 1px solid #1F2937; border-radius: 12px; padding: 16px; font-size: 15px;"
+        )
+
     def change_page_theme(self, theme_name):
+        self.apply_editor_theme(theme_name)
         note = self.get_current_note()
         if note:
-            note["page_theme"] = theme_name
-            self.apply_editor_theme(theme_name)
+            note["theme"] = theme_name
             self.save_data()
-            self.refresh_notes_list()
-
-    def apply_editor_theme(self, theme_name):
-        bg, fg = NOTE_PAGE_THEMES.get(theme_name, ("#111827", "#F8FAFC"))
-        self.editor.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: {bg};
-                color: {fg};
-                border: 1px solid #1F2937;
-                border-radius: 12px;
-                padding: 18px;
-                font-size: 15px;
-                line-height: 1.6;
-            }}
-        """)
 
     def open_floating_window(self):
         note = self.get_current_note()
         if not note:
             return
-        win = FloatingNoteWindow(note, self.save_data, self.sync_from_floating)
+        win = FloatingNoteWindow(note, self)
         win.show()
         self.floating_windows.append(win)
 
-    def sync_from_floating(self, note_id):
-        if self.current_note_id == note_id:
-            note = self.get_current_note()
-            if note:
-                self.title_input.blockSignals(True)
-                self.editor.blockSignals(True)
-                self.title_input.setText(note["title"])
-                self.editor.setHtml(note.get("html_content") or note.get("content", ""))
-                self.title_input.blockSignals(False)
-                self.editor.blockSignals(False)
-                self.update_stats()
-        self.refresh_notes_list()
-
-    # ================= الوظائف الأساسية =================
+    # ================= إدارة الملاحظات =================
     def set_category(self, cat):
         self.current_category = cat
         for k, btn in self.nav_buttons.items():
@@ -714,17 +644,17 @@ class NotesHamzaPro(QMainWindow):
         notes.sort(key=lambda x: x.get("pinned", False), reverse=True)
 
         for n in notes:
-            theme_bg, _ = NOTE_PAGE_THEMES.get(n.get("page_theme", "داكن افتراضي"), ("#161F33", "#FFF"))
-            item = QListWidgetItem(f"{n['title'] or 'بدون عنوان'}
-{n['category']}  •  {n['updated_at']}")
-            item.setData(Qt.ItemDataRole.UserRole, n["id"])
+            title_txt = n["title"] or "بدون عنوان"
+            item_text = f"{title_txt}\n{n['category']}  •  {n['updated_at']}"
+            item = QListWidgetItem(item_text.replace("\\n", "\n"))
             if n.get("password"):
                 item.setIcon(qta.icon("fa5s.lock", color="#EF4444"))
             elif n.get("pinned"):
                 item.setIcon(qta.icon("fa5s.thumbtack", color="#F59E0B"))
             else:
-                item.setIcon(qta.icon("fa5s.sticky-note", color=theme_bg if theme_bg != "#111827" else "#3B82F6"))
+                item.setIcon(qta.icon("fa5s.file-alt", color="#60A5FA"))
 
+            item.setData(Qt.ItemDataRole.UserRole, n["id"])
             self.notes_list.addItem(item)
             if n["id"] == self.current_note_id:
                 item.setSelected(True)
@@ -751,18 +681,19 @@ class NotesHamzaPro(QMainWindow):
         self.current_note_id = note_id
         self.title_input.blockSignals(True)
         self.editor.blockSignals(True)
-        self.page_theme_combo.blockSignals(True)
+        self.theme_combo.blockSignals(True)
 
         self.title_input.setText(note["title"])
-        if note.get("html_content"):
-            self.editor.setHtml(note["html_content"])
+        theme_name = note.get("theme", "افتراضي (ليلي داكن)")
+        self.theme_combo.setCurrentText(theme_name)
+        self.apply_editor_theme(theme_name)
+
+        if note.get("html"):
+            self.editor.setHtml(note["html"])
         else:
-            self.editor.setPlainText(note["content"])
+            self.editor.setPlainText(note.get("content", ""))
 
         self.cat_combo.setCurrentText(note.get("category", "Projects"))
-        theme = note.get("page_theme", "داكن افتراضي")
-        self.page_theme_combo.setCurrentText(theme)
-        self.apply_editor_theme(theme)
 
         if note.get("password"):
             self.lock_btn.setText(" مقفلة")
@@ -775,7 +706,7 @@ class NotesHamzaPro(QMainWindow):
 
         self.title_input.blockSignals(False)
         self.editor.blockSignals(False)
-        self.page_theme_combo.blockSignals(False)
+        self.theme_combo.blockSignals(False)
 
         self.update_stats()
         self.refresh_tasks()
@@ -786,7 +717,7 @@ class NotesHamzaPro(QMainWindow):
         cat = self.current_category if self.current_category not in ["All", "Pinned", "Locked"] else "Projects"
         self.data["notes"].insert(0, {
             "id": new_id, "title": "ملاحظة جديدة", "category": cat,
-            "content": "", "html_content": "", "page_theme": "داكن افتراضي",
+            "content": "", "html": "", "theme": "افتراضي (ليلي داكن)",
             "pinned": False, "password": "",
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "tasks": []
         })
@@ -799,7 +730,7 @@ class NotesHamzaPro(QMainWindow):
             return
         note["title"] = self.title_input.text()
         note["content"] = self.editor.toPlainText()
-        note["html_content"] = self.editor.toHtml()
+        note["html"] = self.editor.toHtml()
         note["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         self.update_stats()
         self.save_data()
@@ -857,11 +788,11 @@ class NotesHamzaPro(QMainWindow):
         note = self.get_current_note()
         if not note:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "تصدير الملاحظة", f"{note['title']}.html", "HTML File (*.html);;Markdown (*.md);;Text (*.txt)")
+        path, _ = QFileDialog.getSaveFileName(self, "تصدير الملاحظة", f"{note['title']}.html", "HTML Document (*.html);;Markdown (*.md);;Text (*.txt)")
         if path:
             with open(path, "w", encoding="utf-8") as f:
                 if path.endswith(".html"):
-                    f.write(note.get("html_content") or note["content"])
+                    f.write(note.get("html") or note.get("content", ""))
                 else:
                     f.write(f"# {note['title']}\n\n{note['content']}\n\n## المهام:\n")
                     for t in note.get("tasks", []):
