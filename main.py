@@ -753,4 +753,4 @@ class NotesHamzaStudio(QMainWindow):
             (self.tr("cat_projects"), "Projects", "fa5s.rocket", "#38BDF8"),
             (self.tr("cat_personal"), "Personal", "fa5s.user", "#34D399"),
             (self.tr("cat_work"), "Work", "fa5s.briefcase", "#FBBF24"),
-            (self.tr("cat_ideas"), "Ideas", "fa5s.lightbulb", "#C
+            (self.tr("cat_ideas"), "Ideas", "fa5s.lightbulb", "#C084FC"),
