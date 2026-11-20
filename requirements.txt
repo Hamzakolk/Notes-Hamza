@@ -1,4 +1,4 @@
 PyQt6
-qtawesome
+QtAwesome
 pillow
 pyinstaller
