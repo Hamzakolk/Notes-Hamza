@@ -1,51 +1,211 @@
-import customtkinter as ctk
+import sys
 import json
 import os
 import threading
 import time
 import winsound
 from datetime import datetime
-from tkinter import messagebox, filedialog, simpledialog
 from PIL import Image, ImageDraw
 
-ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QLineEdit, QTextEdit, QListWidget, QListWidgetItem,
+    QComboBox, QProgressBar, QFrame, QMessageBox, QInputDialog, QFileDialog,
+    QCheckBox
+)
+from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from PyQt6.QtGui import QFont, QIcon, QTextCharFormat
 
 DATA_FILE = "notes_hamza_data.json"
 ICON_FILE = "icon.ico"
 
 def generate_app_icon():
-    """توليد أيقونة احترافية للبرنامج تلقائياً إذا لم تكن موجودة"""
     if not os.path.exists(ICON_FILE):
         img = Image.new("RGBA", (256, 256), (15, 23, 42, 255))
         draw = ImageDraw.Draw(img)
-        draw.rounded_rectangle([20, 20, 236, 236], radius=45, fill=(59, 130, 246, 255))
-        draw.rectangle([65, 70, 191, 90], fill=(255, 255, 255, 255))
-        draw.rectangle([65, 118, 191, 138], fill=(255, 255, 255, 255))
-        draw.rectangle([65, 166, 150, 186], fill=(255, 255, 255, 255))
+        draw.rounded_rectangle([20, 20, 236, 236], radius=50, fill=(59, 130, 246, 255))
+        draw.rounded_rectangle([65, 70, 191, 90], radius=8, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle([65, 118, 191, 138], radius=8, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle([65, 166, 150, 186], radius=8, fill=(147, 197, 253, 255))
         img.save(ICON_FILE, format="ICO", sizes=[(256, 256), (64, 64), (32, 32)])
 
-class NotesHamzaApp(ctk.CTk):
+STYLESHEET = """
+QMainWindow {
+    background-color: #0B0F19;
+}
+QWidget {
+    color: #F8FAFC;
+    font-family: 'Segoe UI', Tahoma, Arial;
+    font-size: 14px;
+}
+#Sidebar {
+    background-color: #111827;
+    border-left: 1px solid #1F2937;
+}
+#LogoLabel {
+    font-size: 20px;
+    font-weight: bold;
+    color: #3B82F6;
+    padding: 15px 5px;
+}
+#NewNoteBtn {
+    background-color: #2563EB;
+    color: white;
+    font-weight: bold;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 15px;
+}
+#NewNoteBtn:hover {
+    background-color: #1D4ED8;
+}
+.NavBtn {
+    background-color: transparent;
+    text-align: right;
+    padding: 10px 15px;
+    border-radius: 8px;
+    color: #9CA3AF;
+    font-weight: 600;
+}
+.NavBtn:hover {
+    background-color: #1F2937;
+    color: #F9FAFB;
+}
+.NavBtn[active="true"] {
+    background-color: #1E293B;
+    color: #3B82F6;
+    border-right: 3px solid #3B82F6;
+}
+#NotesPanel {
+    background-color: #0F172A;
+    border-left: 1px solid #1E293B;
+}
+#SearchBox {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #F8FAFC;
+}
+#SearchBox:focus {
+    border: 1px solid #3B82F6;
+}
+QListWidget {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+QListWidget::item {
+    background-color: #161F33;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 1px solid transparent;
+}
+QListWidget::item:hover {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+}
+QListWidget::item:selected {
+    background-color: #1E293B;
+    border: 1px solid #3B82F6;
+}
+#EditorPanel {
+    background-color: #0B0F19;
+}
+#TitleInput {
+    background-color: transparent;
+    border: none;
+    font-size: 24px;
+    font-weight: bold;
+    color: #FFFFFF;
+    padding: 5px;
+}
+#FormatBar {
+    background-color: #111827;
+    border-radius: 10px;
+    border: 1px solid #1F2937;
+}
+.ToolBtn {
+    background-color: transparent;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #CBD5E1;
+    font-weight: bold;
+}
+.ToolBtn:hover {
+    background-color: #1F2937;
+    color: #FFFFFF;
+}
+#ContentEditor {
+    background-color: #111827;
+    border: 1px solid #1F2937;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 15px;
+    line-height: 1.6;
+}
+QComboBox {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: white;
+}
+#TodoPanel {
+    background-color: #111827;
+    border-right: 1px solid #1F2937;
+}
+QProgressBar {
+    background-color: #1E293B;
+    border-radius: 5px;
+    height: 8px;
+    text-align: center;
+}
+QProgressBar::chunk {
+    background-color: #10B981;
+    border-radius: 5px;
+}
+.TaskCard {
+    background-color: #1E293B;
+    border-radius: 10px;
+    padding: 8px;
+    border: 1px solid #2D3748;
+}
+QLineEdit {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+"""
+
+class AlarmSignaler(QObject):
+    triggered = pyqtSignal(str, str)
+
+class NotesHamzaPro(QMainWindow):
     def __init__(self):
         super().__init__()
         generate_app_icon()
-
-        self.title("Notes Hamza v2.0 - Advanced Notepad & To-Do")
-        self.geometry("1300x780")
-        self.minsize(1050, 620)
+        self.setWindowTitle("Notes Hamza Pro - إدارة الملاحظات والمهام")
+        self.resize(1360, 820)
         if os.path.exists(ICON_FILE):
-            self.iconbitmap(ICON_FILE)
+            self.setWindowIcon(QIcon(ICON_FILE))
 
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.data = self.load_data()
         self.current_note_id = None
         self.current_category = "All"
         self.unlocked_notes = set()
+        self.nav_buttons = {}
 
-        self.setup_ui()
+        self.signaler = AlarmSignaler()
+        self.signaler.triggered.connect(self.show_alarm_popup)
+
+        self.init_ui()
         self.refresh_notes_list()
 
-        self.reminder_thread = threading.Thread(target=self.check_reminders_loop, daemon=True)
-        self.reminder_thread.start()
+        threading.Thread(target=self.reminder_worker, daemon=True).start()
 
     def load_data(self):
         if os.path.exists(DATA_FILE):
@@ -58,15 +218,15 @@ class NotesHamzaApp(ctk.CTk):
             "notes": [
                 {
                     "id": "1",
-                    "title": "مرحباً بك في Notes Hamza v2.0",
+                    "title": "مرحباً بك في التصميم الاحترافي الجديد",
                     "category": "Projects",
-                    "content": "أهلاً بك في النسخة المتقدمة!\n\nالمميزات الجديدة:\n• قفل الملاحظات السرية بكلمة مرور (زر القفل بالأعلى)\n• تحديد وقت تذكير للمهام مع تنبيه صوتي تلقائي\n• جاهز للتصدير والرفع على GitHub",
+                    "content": "تم تطوير واجهة Notes Hamza بالكامل لتدعم اللغة العربية بشكل صحيح وتصميم ويندوز 11 الحديث.\n\n• جرب تنسيق النصوص من الشريط بالأعلى\n• أضف مهامك وحدد وقت التنبيه الصوتي\n• احمِ ملاحظاتك السرية بكلمة مرور",
                     "pinned": True,
                     "password": "",
                     "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "tasks": [
-                        {"text": "تجربة قفل ملاحظة بكلمة مرور", "done": False, "priority": "High", "reminder": "", "alerted": False},
-                        {"text": "رفع المشروع على GitHub", "done": False, "priority": "Medium", "reminder": "", "alerted": False}
+                        {"text": "استكشاف الواجهة الجديدة", "done": True, "priority": "High", "reminder": ""},
+                        {"text": "إضافة مهمة مع وقت تنبيه", "done": False, "priority": "Medium", "reminder": ""}
                     ]
                 }
             ]
@@ -76,292 +236,303 @@ class NotesHamzaApp(ctk.CTk):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=4)
 
-    def setup_ui(self):
-        self.grid_columnconfigure(0, weight=0, minsize=200)
-        self.grid_columnconfigure(1, weight=0, minsize=270)
-        self.grid_columnconfigure(2, weight=2)
-        self.grid_columnconfigure(3, weight=1, minsize=340)
-        self.grid_rowconfigure(0, weight=1)
+    def init_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        # 1. Sidebar
-        self.sidebar = ctk.CTkFrame(self, corner_radius=0, fg_color="#111622")
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        sidebar = QFrame()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(230)
+        side_layout = QVBoxLayout(sidebar)
+        side_layout.setContentsMargins(16, 20, 16, 20)
+        side_layout.setSpacing(8)
 
-        logo_label = ctk.CTkLabel(
-            self.sidebar, text="📝 Notes Hamza",
-            font=ctk.CTkFont(size=20, weight="bold"), text_color="#3B82F6"
-        )
-        logo_label.pack(pady=(25, 20), padx=20, anchor="w")
+        logo = QLabel("📝  Notes Hamza")
+        logo.setObjectName("LogoLabel")
+        side_layout.addWidget(logo)
 
-        new_btn = ctk.CTkButton(
-            self.sidebar, text="+ ملاحظة جديدة", command=self.create_new_note,
-            font=ctk.CTkFont(size=14, weight="bold"), height=38
-        )
-        new_btn.pack(pady=(0, 20), padx=15, fill="x")
+        new_btn = QPushButton("＋  ملاحظة جديدة")
+        new_btn.setObjectName("NewNoteBtn")
+        new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        new_btn.clicked.connect(self.create_note)
+        side_layout.addWidget(new_btn)
+        side_layout.addSpacing(15)
 
-        categories = [("📁 الكل", "All"), ("📌 المثبتة", "Pinned"), ("🔒 المقفلة", "Locked"),
-                      ("🚀 المشاريع", "Projects"), ("👤 شخصي", "Personal"),
-                      ("💼 العمل", "Work"), ("💡 أفكار", "Ideas")]
-        
-        for label, cat in categories:
-            btn = ctk.CTkButton(
-                self.sidebar, text=label, anchor="w", fg_color="transparent",
-                hover_color="#1E293B", text_color="#CBD5E1",
-                command=lambda c=cat: self.filter_category(c)
-            )
-            btn.pack(pady=3, padx=15, fill="x")
+        cats = [
+            ("📁   جميع الملاحظات", "All"),
+            ("📌   المثبتة بالأعلى", "Pinned"),
+            ("🔒   الملاحظات السرية", "Locked"),
+            ("🚀   المشاريع", "Projects"),
+            ("👤   شخصي", "Personal"),
+            ("💼   العمل", "Work"),
+            ("💡   أفكار", "Ideas")
+        ]
+        for text, key in cats:
+            btn = QPushButton(text)
+            btn.setProperty("class", "NavBtn")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, k=key: self.set_category(k))
+            side_layout.addWidget(btn)
+            self.nav_buttons[key] = btn
 
-        export_btn = ctk.CTkButton(
-            self.sidebar, text="📤 تصدير الملاحظة", fg_color="#1E293B",
-            hover_color="#334155", command=self.export_note
-        )
-        export_btn.pack(side="bottom", pady=20, padx=15, fill="x")
+        side_layout.addStretch()
 
-        # 2. Notes List
-        self.notes_list_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#161D2C")
-        self.notes_list_frame.grid(row=0, column=1, sticky="nsew", padx=(1, 1))
-        self.notes_list_frame.grid_rowconfigure(1, weight=1)
-        self.notes_list_frame.grid_columnconfigure(0, weight=1)
+        export_btn = QPushButton("📤  تصدير الملاحظة")
+        export_btn.setProperty("class", "NavBtn")
+        export_btn.clicked.connect(self.export_note)
+        side_layout.addWidget(export_btn)
 
-        self.search_var = ctk.StringVar()
-        self.search_var.trace_add("write", lambda *args: self.refresh_notes_list())
-        search_entry = ctk.CTkEntry(
-            self.notes_list_frame, placeholder_text="🔍 بحث في الملاحظات...",
-            textvariable=self.search_var, height=35, fg_color="#0F172A", border_width=0
-        )
-        search_entry.grid(row=0, column=0, padx=12, pady=15, sticky="ew")
+        notes_panel = QFrame()
+        notes_panel.setObjectName("NotesPanel")
+        notes_panel.setFixedWidth(290)
+        notes_layout = QVBoxLayout(notes_panel)
+        notes_layout.setContentsMargins(14, 20, 14, 14)
+        notes_layout.setSpacing(12)
 
-        self.notes_scroll = ctk.CTkScrollableFrame(self.notes_list_frame, fg_color="transparent")
-        self.notes_scroll.grid(row=1, column=0, sticky="nsew", padx=5)
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("SearchBox")
+        self.search_input.setPlaceholderText("🔍  ابحث في ملاحظاتك...")
+        self.search_input.textChanged.connect(self.refresh_notes_list)
+        notes_layout.addWidget(self.search_input)
 
-        # 3. Editor
-        self.editor_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#0F172A")
-        self.editor_frame.grid(row=0, column=2, sticky="nsew")
-        self.editor_frame.grid_rowconfigure(2, weight=1)
-        self.editor_frame.grid_columnconfigure(0, weight=1)
+        self.notes_list = QListWidget()
+        self.notes_list.itemClicked.connect(self.on_note_clicked)
+        notes_layout.addWidget(self.notes_list)
 
-        top_bar = ctk.CTkFrame(self.editor_frame, fg_color="transparent")
-        top_bar.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 5))
-        top_bar.grid_columnconfigure(0, weight=1)
+        editor_panel = QFrame()
+        editor_panel.setObjectName("EditorPanel")
+        editor_layout = QVBoxLayout(editor_panel)
+        editor_layout.setContentsMargins(24, 20, 24, 16)
+        editor_layout.setSpacing(12)
 
-        self.title_entry = ctk.CTkEntry(
-            top_bar, placeholder_text="عنوان الملاحظة...",
-            font=ctk.CTkFont(size=22, weight="bold"), fg_color="transparent", border_width=0
-        )
-        self.title_entry.grid(row=0, column=0, sticky="ew")
-        self.title_entry.bind("<KeyRelease>", self.auto_save_current_note)
+        header_row = QHBoxLayout()
+        self.title_input = QLineEdit()
+        self.title_input.setObjectName("TitleInput")
+        self.title_input.setPlaceholderText("عنوان الملاحظة...")
+        self.title_input.textEdited.connect(self.auto_save)
+        header_row.addWidget(self.title_input)
 
-        self.cat_menu = ctk.CTkOptionMenu(
-            top_bar, values=["Projects", "Personal", "Work", "Ideas"],
-            width=105, command=self.change_note_category
-        )
-        self.cat_menu.grid(row=0, column=1, padx=4)
+        self.cat_combo = QComboBox()
+        self.cat_combo.addItems(["Projects", "Personal", "Work", "Ideas"])
+        self.cat_combo.currentTextChanged.connect(self.change_category)
+        header_row.addWidget(self.cat_combo)
 
-        self.lock_btn = ctk.CTkButton(top_bar, text="🔓", width=35, fg_color="#1E293B", command=self.manage_password)
-        self.lock_btn.grid(row=0, column=2, padx=3)
+        self.lock_btn = QPushButton("🔓 قفل")
+        self.lock_btn.setProperty("class", "ToolBtn")
+        self.lock_btn.clicked.connect(self.toggle_lock)
+        header_row.addWidget(self.lock_btn)
 
-        self.pin_btn = ctk.CTkButton(top_bar, text="📌", width=35, fg_color="#1E293B", command=self.toggle_pin)
-        self.pin_btn.grid(row=0, column=3, padx=3)
+        self.pin_btn = QPushButton("📌 تثبيت")
+        self.pin_btn.setProperty("class", "ToolBtn")
+        self.pin_btn.clicked.connect(self.toggle_pin)
+        header_row.addWidget(self.pin_btn)
 
-        del_btn = ctk.CTkButton(top_bar, text="🗑️", width=35, fg_color="#7F1D1D", hover_color="#991B1B", command=self.delete_note)
-        del_btn.grid(row=0, column=4, padx=3)
+        del_btn = QPushButton("🗑️")
+        del_btn.setProperty("class", "ToolBtn")
+        del_btn.setStyleSheet("color: #EF4444;")
+        del_btn.clicked.connect(self.delete_note)
+        header_row.addWidget(del_btn)
 
-        format_bar = ctk.CTkFrame(self.editor_frame, fg_color="#1E293B", height=36, corner_radius=8)
-        format_bar.grid(row=1, column=0, sticky="ew", padx=20, pady=8)
+        editor_layout.addLayout(header_row)
 
-        ctk.CTkButton(format_bar, text="• قائمة", width=65, height=26, fg_color="transparent", command=lambda: self.insert_format("• ")).pack(side="left", padx=5, pady=5)
-        ctk.CTkButton(format_bar, text="B عريض", width=65, height=26, fg_color="transparent", command=lambda: self.insert_format("**نص عريض**")).pack(side="left", padx=5)
-        ctk.CTkButton(format_bar, text="</> كود", width=65, height=26, fg_color="transparent", command=lambda: self.insert_format("\n```\nاكتب الكود هنا\n```\n")).pack(side="left", padx=5)
-        ctk.CTkButton(format_bar, text="🕒 الوقت", width=65, height=26, fg_color="transparent", command=lambda: self.insert_format(datetime.now().strftime("%Y-%m-%d %H:%M"))).pack(side="left", padx=5)
+        format_bar = QFrame()
+        format_bar.setObjectName("FormatBar")
+        fmt_layout = QHBoxLayout(format_bar)
+        fmt_layout.setContentsMargins(10, 6, 10, 6)
 
-        self.content_textbox = ctk.CTkTextbox(
-            self.editor_frame, font=ctk.CTkFont(size=15), fg_color="#0F172A",
-            wrap="word", undo=True
-        )
-        self.content_textbox.grid(row=2, column=0, sticky="nsew", padx=20, pady=5)
-        self.content_textbox.bind("<KeyRelease>", self.auto_save_current_note)
+        btn_bold = QPushButton("B  عريض")
+        btn_bold.setProperty("class", "ToolBtn")
+        btn_bold.clicked.connect(self.format_bold)
+        fmt_layout.addWidget(btn_bold)
 
-        self.status_label = ctk.CTkLabel(
-            self.editor_frame, text="الكلمات: 0 | الأحرف: 0",
-            font=ctk.CTkFont(size=12), text_color="#64748B"
-        )
-        self.status_label.grid(row=3, column=0, sticky="e", padx=25, pady=(0, 10))
+        btn_italic = QPushButton("I  مائل")
+        btn_italic.setProperty("class", "ToolBtn")
+        btn_italic.clicked.connect(self.format_italic)
+        fmt_layout.addWidget(btn_italic)
 
-        # 4. To-Do Panel
-        self.todo_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#161D2C")
-        self.todo_frame.grid(row=0, column=3, sticky="nsew", padx=(1, 0))
-        self.todo_frame.grid_rowconfigure(3, weight=1)
-        self.todo_frame.grid_columnconfigure(0, weight=1)
+        btn_bullet = QPushButton("•  نقطة")
+        btn_bullet.setProperty("class", "ToolBtn")
+        btn_bullet.clicked.connect(lambda: self.editor.insertPlainText("• "))
+        fmt_layout.addWidget(btn_bullet)
 
-        todo_header = ctk.CTkLabel(
-            self.todo_frame, text="✅ المهام والتنبيهات (To-Do)",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        todo_header.grid(row=0, column=0, padx=15, pady=(20, 10), sticky="w")
+        btn_time = QPushButton("🕒  إدراج الوقت")
+        btn_time.setProperty("class", "ToolBtn")
+        btn_time.clicked.connect(lambda: self.editor.insertPlainText(datetime.now().strftime("%Y-%m-%d %H:%M ")))
+        fmt_layout.addWidget(btn_time)
 
-        self.progress_label = ctk.CTkLabel(self.todo_frame, text="نسبة الإنجاز: 0%", font=ctk.CTkFont(size=12), text_color="#94A3B8")
-        self.progress_label.grid(row=1, column=0, padx=15, sticky="w")
+        fmt_layout.addStretch()
+        editor_layout.addWidget(format_bar)
 
-        self.progress_bar = ctk.CTkProgressBar(self.todo_frame, height=8)
-        self.progress_bar.grid(row=1, column=0, padx=15, pady=(22, 10), sticky="ew")
-        self.progress_bar.set(0)
+        self.editor = QTextEdit()
+        self.editor.setObjectName("ContentEditor")
+        self.editor.setPlaceholderText("ابدأ بكتابة أفكارك وملاحظاتك هنا...")
+        self.editor.textChanged.connect(self.auto_save)
+        editor_layout.addWidget(self.editor)
 
-        add_task_frame = ctk.CTkFrame(self.todo_frame, fg_color="transparent")
-        add_task_frame.grid(row=2, column=0, padx=15, pady=10, sticky="ew")
-        add_task_frame.grid_columnconfigure(0, weight=1)
+        self.stats_label = QLabel("الكلمات: 0   |   الأحرف: 0")
+        self.stats_label.setStyleSheet("color: #64748B; font-size: 12px;")
+        editor_layout.addWidget(self.stats_label)
 
-        self.task_entry = ctk.CTkEntry(add_task_frame, placeholder_text="أضف مهمة جديدة...")
-        self.task_entry.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 6))
-        self.task_entry.bind("<Return>", lambda e: self.add_task())
+        todo_panel = QFrame()
+        todo_panel.setObjectName("TodoPanel")
+        todo_panel.setFixedWidth(340)
+        todo_layout = QVBoxLayout(todo_panel)
+        todo_layout.setContentsMargins(18, 20, 18, 18)
+        todo_layout.setSpacing(12)
 
-        self.reminder_entry = ctk.CTkEntry(add_task_frame, placeholder_text="تنبيه HH:MM", width=105)
-        self.reminder_entry.grid(row=1, column=0, sticky="w")
+        todo_title = QLabel("✅  قائمة المهام والتنبيهات")
+        todo_title.setStyleSheet("font-size: 17px; font-weight: bold;")
+        todo_layout.addWidget(todo_title)
 
-        self.priority_menu = ctk.CTkOptionMenu(add_task_frame, values=["High", "Medium", "Low"], width=90)
-        self.priority_menu.grid(row=1, column=1, padx=5)
+        self.progress_text = QLabel("نسبة الإنجاز: 0%")
+        self.progress_text.setStyleSheet("color: #94A3B8; font-size: 13px;")
+        todo_layout.addWidget(self.progress_text)
 
-        add_task_btn = ctk.CTkButton(add_task_frame, text="+ إضافة", width=70, command=self.add_task)
-        add_task_btn.grid(row=1, column=2)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        todo_layout.addWidget(self.progress_bar)
 
-        self.tasks_scroll = ctk.CTkScrollableFrame(self.todo_frame, fg_color="transparent")
-        self.tasks_scroll.grid(row=3, column=0, sticky="nsew", padx=10, pady=5)
+        self.task_input = QLineEdit()
+        self.task_input.setPlaceholderText("اكتب مهمة جديدة واضغط Enter...")
+        self.task_input.returnPressed.connect(self.add_task)
+        todo_layout.addWidget(self.task_input)
 
-    def get_current_note(self):
-        for note in self.data["notes"]:
-            if note["id"] == self.current_note_id:
-                return note
-        return None
+        task_controls = QHBoxLayout()
+        self.reminder_input = QLineEdit()
+        self.reminder_input.setPlaceholderText("تنبيه HH:MM")
+        self.reminder_input.setFixedWidth(105)
+        task_controls.addWidget(self.reminder_input)
 
-    def filter_category(self, category):
-        self.current_category = category
+        self.prio_combo = QComboBox()
+        self.prio_combo.addItems(["High", "Medium", "Low"])
+        task_controls.addWidget(self.prio_combo)
+
+        add_task_btn = QPushButton("＋ إضافة")
+        add_task_btn.setStyleSheet("background-color: #2563EB; border-radius: 8px; padding: 8px 14px; font-weight: bold;")
+        add_task_btn.clicked.connect(self.add_task)
+        task_controls.addWidget(add_task_btn)
+        todo_layout.addLayout(task_controls)
+
+        self.tasks_container = QVBoxLayout()
+        self.tasks_container.setSpacing(8)
+        todo_layout.addLayout(self.tasks_container)
+        todo_layout.addStretch()
+
+        main_layout.addWidget(sidebar)
+        main_layout.addWidget(notes_panel)
+        main_layout.addWidget(editor_panel, 1)
+        main_layout.addWidget(todo_panel)
+
+        self.set_category("All")
+
+    def set_category(self, cat):
+        self.current_category = cat
+        for k, btn in self.nav_buttons.items():
+            btn.setProperty("active", "true" if k == cat else "false")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
         self.refresh_notes_list()
 
+    def get_current_note(self):
+        return next((n for n in self.data["notes"] if n["id"] == self.current_note_id), None)
+
     def refresh_notes_list(self):
-        for widget in self.notes_scroll.winfo_children():
-            widget.destroy()
+        self.notes_list.clear()
+        query = self.search_input.text().lower()
+        notes = []
 
-        query = self.search_var.get().lower()
-        filtered_notes = []
-
-        for note in self.data["notes"]:
-            is_locked = bool(note.get("password"))
-            if self.current_category == "Pinned" and not note.get("pinned", False):
+        for n in self.data["notes"]:
+            is_locked = bool(n.get("password"))
+            if self.current_category == "Pinned" and not n.get("pinned"):
                 continue
             elif self.current_category == "Locked" and not is_locked:
                 continue
-            elif self.current_category not in ["All", "Pinned", "Locked"] and note.get("category") != self.current_category:
+            elif self.current_category not in ["All", "Pinned", "Locked"] and n.get("category") != self.current_category:
                 continue
 
-            searchable_content = "" if is_locked else note["content"].lower()
-            if query in note["title"].lower() or query in searchable_content:
-                filtered_notes.append(note)
+            if query in n["title"].lower() or (not is_locked and query in n["content"].lower()):
+                notes.append(n)
 
-        filtered_notes.sort(key=lambda x: x.get("pinned", False), reverse=True)
+        notes.sort(key=lambda x: x.get("pinned", False), reverse=True)
 
-        for note in filtered_notes:
-            is_selected = (note["id"] == self.current_note_id)
-            bg_color = "#1E293B" if is_selected else "transparent"
-            pin_icon = "📌 " if note.get("pinned") else ""
-            lock_icon = "🔒 " if note.get("password") else ""
-            
-            card = ctk.CTkButton(
-                self.notes_scroll,
-                text=f"{pin_icon}{lock_icon}{note['title'] or 'بدون عنوان'}\n{note['category']} • {note['updated_at']}",
-                anchor="w", fg_color=bg_color, hover_color="#1E293B",
-                height=55, corner_radius=8,
-                command=lambda n_id=note["id"]: self.select_note(n_id)
-            )
-            card.pack(fill="x", pady=3, padx=5)
+        for n in notes:
+            icons = ("📌 " if n.get("pinned") else "") + ("🔒 " if n.get("password") else "")
+            item = QListWidgetItem(f"{icons}{n['title'] or 'بدون عنوان'}\n{n['category']}  •  {n['updated_at']}")
+            item.setData(Qt.ItemDataRole.UserRole, n["id"])
+            self.notes_list.addItem(item)
+            if n["id"] == self.current_note_id:
+                item.setSelected(True)
 
-        if not self.current_note_id and filtered_notes:
-            self.select_note(filtered_notes[0]["id"])
+        if not self.current_note_id and notes:
+            self.load_note(notes[0]["id"])
 
-    def select_note(self, note_id):
-        target_note = next((n for n in self.data["notes"] if n["id"] == note_id), None)
-        if not target_note:
+    def on_note_clicked(self, item):
+        note_id = item.data(Qt.ItemDataRole.UserRole)
+        self.load_note(note_id)
+
+    def load_note(self, note_id):
+        note = next((n for n in self.data["notes"] if n["id"] == note_id), None)
+        if not note:
             return
 
-        if target_note.get("password") and note_id not in self.unlocked_notes:
-            pwd = simpledialog.askstring("ملاحظة محمية 🔒", "أدخل كلمة المرور لفتح الملاحظة:", show="*")
-            if pwd != target_note["password"]:
-                if pwd is not None:
-                    messagebox.showerror("خطأ", "كلمة المرور غير صحيحة!")
+        if note.get("password") and note_id not in self.unlocked_notes:
+            pwd, ok = QInputDialog.getText(self, "ملاحظة محمية 🔒", "أدخل كلمة المرور:", QLineEdit.EchoMode.Password)
+            if not ok or pwd != note["password"]:
+                if ok:
+                    QMessageBox.warning(self, "خطأ", "كلمة المرور غير صحيحة!")
                 return
             self.unlocked_notes.add(note_id)
 
         self.current_note_id = note_id
-        self.title_entry.delete(0, "end")
-        self.title_entry.insert(0, target_note["title"])
+        self.title_input.blockSignals(True)
+        self.editor.blockSignals(True)
 
-        self.content_textbox.delete("1.0", "end")
-        self.content_textbox.insert("1.0", target_note["content"])
+        self.title_input.setText(note["title"])
+        self.editor.setPlainText(note["content"])
+        self.cat_combo.setCurrentText(note.get("category", "Projects"))
 
-        self.cat_menu.set(target_note.get("category", "Projects"))
-        self.pin_btn.configure(fg_color="#3B82F6" if target_note.get("pinned") else "#1E293B")
-        self.lock_btn.configure(
-            text="🔒" if target_note.get("password") else "🔓",
-            fg_color="#D97706" if target_note.get("password") else "#1E293B"
-        )
+        self.lock_btn.setText("🔒 مقفلة" if note.get("password") else "🔓 قفل")
+        self.pin_btn.setStyleSheet("color: #3B82F6;" if note.get("pinned") else "")
 
-        self.update_word_count()
-        self.refresh_tasks_list()
+        self.title_input.blockSignals(False)
+        self.editor.blockSignals(False)
+
+        self.update_stats()
+        self.refresh_tasks()
         self.refresh_notes_list()
 
-    def manage_password(self):
-        note = self.get_current_note()
-        if not note:
-            return
-
-        if note.get("password"):
-            if messagebox.askyesno("إزالة القفل", "هذه الملاحظة مقفلة حالياً. هل تريد إزالة كلمة المرور؟"):
-                note["password"] = ""
-                self.lock_btn.configure(text="🔓", fg_color="#1E293B")
-                self.save_data()
-                self.refresh_notes_list()
-        else:
-            new_pwd = simpledialog.askstring("قفل الملاحظة 🔒", "أدخل كلمة مرور جديدة لحماية هذه الملاحظة:", show="*")
-            if new_pwd and new_pwd.strip():
-                note["password"] = new_pwd.strip()
-                self.unlocked_notes.add(note["id"])
-                self.lock_btn.configure(text="🔒", fg_color="#D97706")
-                self.save_data()
-                self.refresh_notes_list()
-                messagebox.showinfo("تم القفل", "تم تأمين الملاحظة بكلمة مرور بنجاح!")
-
-    def create_new_note(self):
+    def create_note(self):
         new_id = str(int(datetime.now().timestamp() * 1000))
-        new_note = {
-            "id": new_id,
-            "title": "ملاحظة جديدة",
-            "category": self.current_category if self.current_category not in ["All", "Pinned", "Locked"] else "Projects",
-            "content": "",
-            "pinned": False,
-            "password": "",
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "tasks": []
-        }
-        self.data["notes"].insert(0, new_note)
+        cat = self.current_category if self.current_category not in ["All", "Pinned", "Locked"] else "Projects"
+        self.data["notes"].insert(0, {
+            "id": new_id, "title": "ملاحظة جديدة", "category": cat,
+            "content": "", "pinned": False, "password": "",
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "tasks": []
+        })
         self.save_data()
-        self.select_note(new_id)
+        self.load_note(new_id)
 
-    def auto_save_current_note(self, event=None):
+    def auto_save(self):
         note = self.get_current_note()
         if not note:
             return
-        note["title"] = self.title_entry.get()
-        note["content"] = self.content_textbox.get("1.0", "end-1c")
+        note["title"] = self.title_input.text()
+        note["content"] = self.editor.toPlainText()
         note["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        self.update_word_count()
+        self.update_stats()
         self.save_data()
 
-    def update_word_count(self):
-        text = self.content_textbox.get("1.0", "end-1c")
-        self.status_label.configure(text=f"الكلمات: {len(text.split())} | الأحرف: {len(text)}")
+    def update_stats(self):
+        txt = self.editor.toPlainText()
+        self.stats_label.setText(f"الكلمات: {len(txt.split())}   |   الأحرف: {len(txt)}")
 
-    def change_note_category(self, new_cat):
+    def change_category(self, cat):
         note = self.get_current_note()
         if note:
-            note["category"] = new_cat
+            note["category"] = cat
             self.save_data()
             self.refresh_notes_list()
 
@@ -369,144 +540,160 @@ class NotesHamzaApp(ctk.CTk):
         note = self.get_current_note()
         if note:
             note["pinned"] = not note.get("pinned", False)
-            self.pin_btn.configure(fg_color="#3B82F6" if note["pinned"] else "#1E293B")
             self.save_data()
-            self.refresh_notes_list()
+            self.load_note(note["id"])
+
+    def toggle_lock(self):
+        note = self.get_current_note()
+        if not note:
+            return
+        if note.get("password"):
+            reply = QMessageBox.question(self, "إزالة القفل", "هل تريد إزالة كلمة المرور عن هذه الملاحظة؟")
+            if reply == QMessageBox.StandardButton.Yes:
+                note["password"] = ""
+                self.save_data()
+                self.load_note(note["id"])
+        else:
+            pwd, ok = QInputDialog.getText(self, "قفل الملاحظة 🔒", "أدخل كلمة مرور جديدة:", QLineEdit.EchoMode.Password)
+            if ok and pwd.strip():
+                note["password"] = pwd.strip()
+                self.unlocked_notes.add(note["id"])
+                self.save_data()
+                self.load_note(note["id"])
 
     def delete_note(self):
         if not self.current_note_id:
             return
-        if messagebox.askyesno("تأكيد الحذف", "هل أنت متأكد من حذف هذه الملاحظة؟"):
+        reply = QMessageBox.question(self, "حذف الملاحظة", "هل أنت متأكد من حذف هذه الملاحظة نهائياً؟")
+        if reply == QMessageBox.StandardButton.Yes:
             self.data["notes"] = [n for n in self.data["notes"] if n["id"] != self.current_note_id]
             self.current_note_id = None
+            self.title_input.clear()
+            self.editor.clear()
             self.save_data()
-            self.title_entry.delete(0, "end")
-            self.content_textbox.delete("1.0", "end")
             self.refresh_notes_list()
-            self.refresh_tasks_list()
+            self.refresh_tasks()
 
-    def insert_format(self, text):
-        self.content_textbox.insert("insert", text)
-        self.auto_save_current_note()
+    def format_bold(self):
+        fmt = QTextCharFormat()
+        fmt.setFontWeight(QFont.Weight.Bold if self.editor.fontWeight() != QFont.Weight.Bold else QFont.Weight.Normal)
+        self.editor.mergeCurrentCharFormat(fmt)
+
+    def format_italic(self):
+        self.editor.setFontItalic(not self.editor.fontItalic())
 
     def export_note(self):
         note = self.get_current_note()
         if not note:
             return
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".md",
-            initialfile=f"{note['title']}.md",
-            filetypes=[("Markdown File", "*.md"), ("Text File", "*.txt")]
-        )
-        if file_path:
-            with open(file_path, "w", encoding="utf-8") as f:
+        path, _ = QFileDialog.getSaveFileName(self, "تصدير الملاحظة", f"{note['title']}.md", "Markdown (*.md);;Text (*.txt)")
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(f"# {note['title']}\n\n{note['content']}\n\n## المهام:\n")
                 for t in note.get("tasks", []):
-                    status = "[x]" if t["done"] else "[ ]"
-                    rem = f" [⏰ {t['reminder']}]" if t.get("reminder") else ""
-                    f.write(f"- {status} {t['text']} ({t['priority']}){rem}\n")
-            messagebox.showinfo("تم التصدير", "تم حفظ الملف بنجاح!")
+                    f.write(f"- [{'x' if t['done'] else ' '}] {t['text']} ({t['priority']})\n")
+            QMessageBox.information(self, "تم التصدير", "تم حفظ الملاحظة بنجاح!")
 
     def add_task(self):
         note = self.get_current_note()
-        task_text = self.task_entry.get().strip()
-        reminder_time = self.reminder_entry.get().strip()
-        if not note or not task_text:
+        txt = self.task_input.text().strip()
+        rem = self.reminder_input.text().strip()
+        if not note or not txt:
             return
-
-        if reminder_time:
+        if rem:
             try:
-                datetime.strptime(reminder_time, "%H:%M")
+                datetime.strptime(rem, "%H:%M")
             except ValueError:
-                messagebox.showwarning("تنسيق خاطئ", "يرجى إدخال وقت التنبيه بصيغة HH:MM مثل 14:30")
+                QMessageBox.warning(self, "تنسيق خاطئ", "أدخل وقت التنبيه بصيغة HH:MM مثل 18:30")
                 return
 
         note.setdefault("tasks", []).append({
-            "text": task_text,
-            "done": False,
-            "priority": self.priority_menu.get(),
-            "reminder": reminder_time,
-            "alerted": False
+            "text": txt, "done": False, "priority": self.prio_combo.currentText(),
+            "reminder": rem, "alerted": False
         })
-        self.task_entry.delete(0, "end")
-        self.reminder_entry.delete(0, "end")
+        self.task_input.clear()
+        self.reminder_input.clear()
         self.save_data()
-        self.refresh_tasks_list()
+        self.refresh_tasks()
 
-    def refresh_tasks_list(self):
-        for widget in self.tasks_scroll.winfo_children():
-            widget.destroy()
+    def refresh_tasks(self):
+        while self.tasks_container.count():
+            child = self.tasks_container.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
 
         note = self.get_current_note()
         tasks = note.get("tasks", []) if note else []
-        priority_colors = {"High": "#EF4444", "Medium": "#F59E0B", "Low": "#10B981"}
+        colors = {"High": "#EF4444", "Medium": "#F59E0B", "Low": "#10B981"}
 
-        for idx, task in enumerate(tasks):
-            row = ctk.CTkFrame(self.tasks_scroll, fg_color="#1E293B", corner_radius=8)
-            row.pack(fill="x", pady=4, padx=2)
+        for idx, t in enumerate(tasks):
+            card = QFrame()
+            card.setProperty("class", "TaskCard")
+            row = QHBoxLayout(card)
+            row.setContentsMargins(10, 6, 10, 6)
 
-            rem_text = f" ⏰ {task['reminder']}" if task.get("reminder") else ""
-            var = ctk.BooleanVar(value=task["done"])
-            cb = ctk.CTkCheckBox(
-                row, text=f"{task['text']}{rem_text}", variable=var,
-                command=lambda i=idx: self.toggle_task(i)
-            )
-            cb.pack(side="left", padx=10, pady=8)
+            rem_str = f"  ⏰ {t['reminder']}" if t.get("reminder") else ""
+            cb = QCheckBox(f"{t['text']}{rem_str}")
+            cb.setChecked(t["done"])
+            cb.stateChanged.connect(lambda state, i=idx: self.toggle_task(i))
+            row.addWidget(cb, 1)
 
-            del_t = ctk.CTkButton(
-                row, text="✕", width=24, height=24, fg_color="transparent",
-                hover_color="#7F1D1D", command=lambda i=idx: self.delete_task(i)
-            )
-            del_t.pack(side="right", padx=5)
+            badge = QLabel(t["priority"])
+            badge.setStyleSheet(f"color: {colors.get(t['priority'], '#FFF')}; font-weight: bold; font-size: 11px;")
+            row.addWidget(badge)
 
-            badge = ctk.CTkLabel(
-                row, text=task["priority"], font=ctk.CTkFont(size=10, weight="bold"),
-                text_color=priority_colors.get(task["priority"], "#FFFFFF")
-            )
-            badge.pack(side="right", padx=5)
+            del_btn = QPushButton("✕")
+            del_btn.setStyleSheet("color: #94A3B8; border: none; font-weight: bold;")
+            del_btn.clicked.connect(lambda checked, i=idx: self.delete_task(i))
+            row.addWidget(del_btn)
+
+            self.tasks_container.addWidget(card)
 
         if tasks:
-            done_count = sum(1 for t in tasks if t["done"])
-            ratio = done_count / len(tasks)
-            self.progress_bar.set(ratio)
-            self.progress_label.configure(text=f"نسبة الإنجاز: {int(ratio * 100)}% ({done_count}/{len(tasks)})")
+            done = sum(1 for t in tasks if t["done"])
+            pct = int((done / len(tasks)) * 100)
+            self.progress_bar.setValue(pct)
+            self.progress_text.setText(f"نسبة الإنجاز: {pct}% ({done} من {len(tasks)})")
         else:
-            self.progress_bar.set(0)
-            self.progress_label.configure(text="نسبة الإنجاز: 0%")
+            self.progress_bar.setValue(0)
+            self.progress_text.setText("نسبة الإنجاز: 0%")
 
     def toggle_task(self, idx):
         note = self.get_current_note()
         if note:
             note["tasks"][idx]["done"] = not note["tasks"][idx]["done"]
             self.save_data()
-            self.refresh_tasks_list()
+            self.refresh_tasks()
 
     def delete_task(self, idx):
         note = self.get_current_note()
         if note:
             note["tasks"].pop(idx)
             self.save_data()
-            self.refresh_tasks_list()
+            self.refresh_tasks()
 
-    def check_reminders_loop(self):
+    def reminder_worker(self):
         while True:
-            now_str = datetime.now().strftime("%H:%M")
+            now = datetime.now().strftime("%H:%M")
             for note in self.data.get("notes", []):
-                for task in note.get("tasks", []):
-                    if not task.get("done") and task.get("reminder") == now_str and not task.get("alerted"):
-                        task["alerted"] = True
+                for t in note.get("tasks", []):
+                    if not t.get("done") and t.get("reminder") == now and not t.get("alerted"):
+                        t["alerted"] = True
                         self.save_data()
-                        self.after(0, lambda t=task["text"], n=note["title"]: self.trigger_alarm(t, n))
+                        self.signaler.triggered.emit(t["text"], note["title"])
             time.sleep(10)
 
-    def trigger_alarm(self, task_text, note_title):
+    def show_alarm_popup(self, task_text, note_title):
         try:
-            winsound.Beep(1000, 700)
-            winsound.Beep(1200, 700)
+            winsound.Beep(1000, 600)
+            winsound.Beep(1300, 600)
         except Exception:
             pass
-        messagebox.showinfo("⏰ تذكير بمهمة - Notes Hamza", f"حان موعد المهمة:\n\n• {task_text}\n(من ملاحظة: {note_title})")
+        QMessageBox.information(self, "⏰ تذكير بمهمة - Notes Hamza", f"حان موعد المهمة:\n\n• {task_text}\n(من ملاحظة: {note_title})")
 
 if __name__ == "__main__":
-    app = NotesHamzaApp()
-    app.mainloop()
+    app = QApplication(sys.argv)
+    app.setStyleSheet(STYLESHEET)
+    window = NotesHamzaPro()
+    window.show()
+    sys.exit(app.exec())
