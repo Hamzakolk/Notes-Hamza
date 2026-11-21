@@ -20,9 +20,10 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTextEdit, QListWidget, QListWidgetItem,
     QComboBox, QProgressBar, QFrame, QMessageBox, QInputDialog, QFileDialog,
-    QCheckBox, QFontComboBox, QColorDialog, QDialog, QFormLayout, QStatusBar
+    QCheckBox, QFontComboBox, QColorDialog, QDialog, QFormLayout, QStatusBar,
+    QSplitter
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QFont, QIcon, QTextCharFormat, QTextListFormat
 
 
@@ -122,7 +123,7 @@ TRANSLATIONS = {
         "status_synced": "تمت مزامنة Google Keep ({time})",
         "status_sync_fail": "تعذرت المزامنة: {err}",
         "sync_err_title": "خطأ المزامنة",
-        "status_theme_changed": "تم تغيير مظهر الصفحة إلى: {theme}",
+        "status_theme_changed": "تم تغيير مظهر الواجهة بالكامل إلى: {theme}",
         "status_float_opened": "تم فتح الملاحظة في نافذة عائمة",
         "status_selected_all": "تم تحديد نص الملاحظة بالكامل",
         "status_nothing_to_copy": "لا يوجد محتوى لنسخه",
@@ -233,7 +234,7 @@ TRANSLATIONS = {
         "status_synced": "Synced with Google Keep ({time})",
         "status_sync_fail": "Sync failed: {err}",
         "sync_err_title": "Sync Error",
-        "status_theme_changed": "Page theme changed to: {theme}",
+        "status_theme_changed": "Full workspace theme changed to: {theme}",
         "status_float_opened": "Opened note in floating window",
         "status_selected_all": "Selected entire note text",
         "status_nothing_to_copy": "Nothing to copy",
@@ -288,104 +289,145 @@ def generate_app_icon():
 def get_page_themes(lang="ar"):
     t = TRANSLATIONS.get(lang, TRANSLATIONS["ar"])
     return {
-        t["theme_dark"]: {"bg": "#141A29", "fg": "#F1F5F9", "border": "#263148", "ruled": False},
-        t["theme_midnight"]: {"bg": "#0D1B2A", "fg": "#E0E1DD", "border": "#1B263B", "ruled": False},
-        t["theme_emerald"]: {"bg": "#0B2520", "fg": "#E6F4F1", "border": "#19433B", "ruled": False},
-        t["theme_cream"]: {"bg": "#FBF7E9", "fg": "#1E293B", "border": "#E6DEC3", "ruled": False},
-        t["theme_white"]: {"bg": "#FFFFFF", "fg": "#0F172A", "border": "#E2E8F0", "ruled": False},
+        t["theme_dark"]: {
+            "bg": "#141A29", "fg": "#F1F5F9", "border": "#263148", "ruled": False,
+            "win_bg": "#0B0F1A", "panel_bg": "#101624", "list_bg": "#0E1422",
+            "card_bg": "#151E30", "muted": "#94A3B8", "accent": "#4F46E5", "accent_hover": "#4338CA",
+            "active_bg": "rgba(79, 70, 229, 0.20)", "active_fg": "#A5B4FC", "brand_sub": "#818CF8"
+        },
+        t["theme_midnight"]: {
+            "bg": "#112238", "fg": "#E0E1DD", "border": "#1E3A5F", "ruled": False,
+            "win_bg": "#091322", "panel_bg": "#0D1B2A", "list_bg": "#0B1726",
+            "card_bg": "#162A42", "muted": "#8DA9C4", "accent": "#2563EB", "accent_hover": "#1D4ED8",
+            "active_bg": "rgba(37, 99, 235, 0.22)", "active_fg": "#93C5FD", "brand_sub": "#60A5FA"
+        },
+        t["theme_emerald"]: {
+            "bg": "#0E2E27", "fg": "#E6F4F1", "border": "#1D5449", "ruled": False,
+            "win_bg": "#071A16", "panel_bg": "#0B2520", "list_bg": "#09201C",
+            "card_bg": "#123830", "muted": "#88C0B4", "accent": "#059669", "accent_hover": "#047857",
+            "active_bg": "rgba(5, 150, 105, 0.22)", "active_fg": "#6EE7B7", "brand_sub": "#34D399"
+        },
+        t["theme_cream"]: {
+            "bg": "#FBF7E9", "fg": "#1E293B", "border": "#DFD5B8", "ruled": False,
+            "win_bg": "#F3EDE0", "panel_bg": "#F8F3E6", "list_bg": "#F5EFE1",
+            "card_bg": "#EFE7D2", "muted": "#57534E", "accent": "#B45309", "accent_hover": "#92400E",
+            "active_bg": "rgba(180, 83, 9, 0.14)", "active_fg": "#92400E", "brand_sub": "#B45309"
+        },
+        t["theme_white"]: {
+            "bg": "#FFFFFF", "fg": "#0F172A", "border": "#CBD5E1", "ruled": False,
+            "win_bg": "#F1F5F9", "panel_bg": "#F8FAFC", "list_bg": "#F4F6F9",
+            "card_bg": "#E2E8F0", "muted": "#475569", "accent": "#4F46E5", "accent_hover": "#4338CA",
+            "active_bg": "rgba(79, 70, 229, 0.14)", "active_fg": "#3730A3", "brand_sub": "#4F46E5"
+        },
         t["theme_sticky"]: {
-            "bg": "#FFFBEB",
-            "fg": "#292524",
-            "border": "#FDE68A",
-            "ruled": True,
-            "line": "#F3E8B4"
+            "bg": "#FFFBEB", "fg": "#292524", "border": "#FDE68A", "ruled": True, "line": "#F3E8B4",
+            "win_bg": "#FEF3C7", "panel_bg": "#FFFBEB", "list_bg": "#FEF9C3",
+            "card_bg": "#FDE68A", "muted": "#57534E", "accent": "#D97706", "accent_hover": "#B45309",
+            "active_bg": "rgba(217, 119, 6, 0.18)", "active_fg": "#92400E", "brand_sub": "#B45309"
         }
     }
 
 
-def get_stylesheet(lang="ar"):
+def get_stylesheet(lang="ar", theme_cfg=None):
+    if not theme_cfg:
+        theme_cfg = next(iter(get_page_themes(lang).values()))
+
     align = "right" if lang == "ar" else "left"
     border_side = "border-left" if lang == "ar" else "border-right"
     opp_border_side = "border-right" if lang == "ar" else "border-left"
     active_border = "border-right" if lang == "ar" else "border-left"
+
+    win_bg = theme_cfg["win_bg"]
+    panel_bg = theme_cfg["panel_bg"]
+    list_bg = theme_cfg["list_bg"]
+    card_bg = theme_cfg["card_bg"]
+    fg = theme_cfg["fg"]
+    muted = theme_cfg["muted"]
+    border = theme_cfg["border"]
+    accent = theme_cfg["accent"]
+    accent_hover = theme_cfg["accent_hover"]
+    active_bg = theme_cfg["active_bg"]
+    active_fg = theme_cfg["active_fg"]
+    brand_sub = theme_cfg["brand_sub"]
+
     return f"""
 QMainWindow {{
-    background-color: #0B0F1A;
+    background-color: {win_bg};
 }}
 QWidget {{
-    color: #E2E8F0;
+    color: {fg};
     font-family: 'Segoe UI', 'Tahoma', Arial;
     font-size: 13.5px;
 }}
 #Sidebar {{
-    background-color: #101624;
-    {border_side}: 1px solid #1E293B;
+    background-color: {panel_bg};
+    {border_side}: 1px solid {border};
 }}
 #BrandTitle {{
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 700;
-    color: #F8FAFC;
+    color: {fg};
 }}
 #BrandSub {{
     font-size: 11.5px;
-    color: #818CF8;
+    color: {brand_sub};
 }}
 #PrimaryBtn {{
-    background-color: #4F46E5;
+    background-color: {accent};
     color: #FFFFFF;
     font-weight: 700;
     border: none;
     border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 13.5px;
+    padding: 9px 12px;
+    font-size: 13px;
 }}
 #PrimaryBtn:hover {{
-    background-color: #4338CA;
+    background-color: {accent_hover};
 }}
 #SyncBtn {{
-    background-color: #162033;
-    color: #E2E8F0;
-    border: 1px solid #2A3A55;
+    background-color: {card_bg};
+    color: {fg};
+    border: 1px solid {border};
     border-radius: 10px;
-    padding: 9px 12px;
+    padding: 8px 10px;
     font-weight: 600;
 }}
 #SyncBtn:hover {{
-    background-color: #1E2D47;
-    border-color: #6366F1;
+    border-color: {accent};
 }}
 .NavItem {{
     background-color: transparent;
     text-align: {align};
-    padding: 9px 12px;
+    padding: 8px 10px;
     border-radius: 9px;
-    color: #94A3B8;
+    color: {muted};
     font-weight: 600;
     border: none;
 }}
 .NavItem:hover {{
-    background-color: #172033;
-    color: #F8FAFC;
+    background-color: {card_bg};
+    color: {fg};
 }}
 .NavItem[active="true"] {{
-    background-color: rgba(79, 70, 229, 0.18);
-    color: #A5B4FC;
-    {active_border}: 3px solid #6366F1;
+    background-color: {active_bg};
+    color: {active_fg};
+    {active_border}: 3px solid {accent};
 }}
 #NotesListPanel {{
-    background-color: #0E1422;
-    {border_side}: 1px solid #1E293B;
+    background-color: {list_bg};
+    {border_side}: 1px solid {border};
 }}
 QLineEdit {{
-    background-color: #151E30;
-    border: 1px solid #26334D;
+    background-color: {card_bg};
+    border: 1px solid {border};
     border-radius: 9px;
-    padding: 8px 12px;
-    color: #F8FAFC;
-    selection-background-color: #4F46E5;
+    padding: 7px 10px;
+    color: {fg};
+    selection-background-color: {accent};
+    selection-color: #FFFFFF;
 }}
 QLineEdit:focus {{
-    border-color: #6366F1;
+    border-color: {accent};
 }}
 QListWidget {{
     background-color: transparent;
@@ -393,107 +435,109 @@ QListWidget {{
     outline: none;
 }}
 QListWidget::item {{
-    background-color: #141C2E;
-    border: 1px solid #1E293B;
-    border-radius: 11px;
-    padding: 11px 12px;
-    margin-bottom: 8px;
+    background-color: {card_bg};
+    border: 1px solid {border};
+    border-radius: 10px;
+    padding: 9px 10px;
+    margin-bottom: 6px;
+    color: {fg};
 }}
 QListWidget::item:hover {{
-    background-color: #19243B;
-    border-color: #334155;
+    border-color: {accent};
 }}
 QListWidget::item:selected {{
-    background-color: rgba(79, 70, 229, 0.16);
-    border-color: #6366F1;
+    background-color: {active_bg};
+    border-color: {accent};
+    color: {active_fg};
 }}
 #EditorContainer {{
-    background-color: #0B0F1A;
+    background-color: {win_bg};
 }}
 #NoteTitleEdit {{
     background-color: transparent;
     border: none;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
-    color: #FFFFFF;
+    color: {fg};
     padding: 4px 6px;
 }}
 #NoteTitleEdit:focus {{
-    background-color: #121929;
+    background-color: {card_bg};
     border-radius: 8px;
 }}
 #ToolbarCard {{
-    background-color: #111827;
-    border: 1px solid #1F2937;
+    background-color: {panel_bg};
+    border: 1px solid {border};
     border-radius: 12px;
 }}
 .IconActionBtn {{
-    background-color: #172033;
-    border: 1px solid #26334D;
+    background-color: {card_bg};
+    border: 1px solid {border};
     border-radius: 8px;
-    padding: 6px 9px;
-    color: #CBD5E1;
+    padding: 5px 8px;
+    color: {fg};
     font-weight: 600;
 }}
 .IconActionBtn:hover {{
-    background-color: #22304C;
-    color: #FFFFFF;
-    border-color: #475569;
+    border-color: {accent};
 }}
 .QuickTimeBtn {{
-    background-color: #182236;
-    border: 1px solid #2A3A55;
+    background-color: {card_bg};
+    border: 1px solid {border};
     border-radius: 7px;
-    padding: 4px 8px;
-    color: #93C5FD;
-    font-size: 11.5px;
+    padding: 4px 7px;
+    color: {active_fg};
+    font-size: 11px;
     font-weight: 600;
 }}
 .QuickTimeBtn:hover {{
-    background-color: #23324E;
+    border-color: {accent};
 }}
 QComboBox, QFontComboBox {{
-    background-color: #172033;
-    border: 1px solid #26334D;
+    background-color: {card_bg};
+    border: 1px solid {border};
     border-radius: 8px;
     padding: 5px 8px;
-    color: #F1F5F9;
+    color: {fg};
 }}
 QComboBox:hover, QFontComboBox:hover {{
-    border-color: #6366F1;
+    border-color: {accent};
 }}
 QComboBox QAbstractItemView, QFontComboBox QAbstractItemView {{
-    background-color: #131B2C;
-    color: #F1F5F9;
-    selection-background-color: #4F46E5;
-    border: 1px solid #26334D;
+    background-color: {panel_bg};
+    color: {fg};
+    selection-background-color: {accent};
+    selection-color: #FFFFFF;
+    border: 1px solid {border};
 }}
 #TasksPanel {{
-    background-color: #101624;
-    {opp_border_side}: 1px solid #1E293B;
+    background-color: {panel_bg};
+    {opp_border_side}: 1px solid {border};
 }}
 QProgressBar {{
-    background-color: #1A2438;
-    border: none;
+    background-color: {card_bg};
+    border: 1px solid {border};
     border-radius: 5px;
-    height: 7px;
+    height: 8px;
+    text-align: center;
 }}
 QProgressBar::chunk {{
-    background-color: #10B981;
-    border-radius: 5px;
+    background-color: {accent};
+    border-radius: 4px;
 }}
 .TaskRowCard {{
-    background-color: #151E30;
-    border: 1px solid #23304A;
+    background-color: {card_bg};
+    border: 1px solid {border};
     border-radius: 10px;
 }}
-.TaskRowCard:hover {{
-    border-color: #334155;
+QSplitter::handle {{
+    background-color: {border};
+    width: 2px;
 }}
 QStatusBar {{
-    background-color: #0E1422;
-    color: #94A3B8;
-    border-top: 1px solid #1E293B;
+    background-color: {list_bg};
+    color: {muted};
+    border-top: 1px solid {border};
     font-size: 12px;
 }}
 """
@@ -613,7 +657,8 @@ class NotesHamzaStudio(QMainWindow):
         if self.lang not in TRANSLATIONS:
             self.lang = "ar"
 
-        self.resize(1420, 860)
+        self.setMinimumSize(520, 420)
+        self.resize(1360, 820)
         if os.path.exists(ICON_FILE):
             self.setWindowIcon(QIcon(ICON_FILE))
 
@@ -631,6 +676,11 @@ class NotesHamzaStudio(QMainWindow):
         self.apply_language_direction()
         self.build_ui()
         self.refresh_notes_list()
+
+        self.auto_save_timer = QTimer(self)
+        self.auto_save_timer.setInterval(15000)
+        self.auto_save_timer.timeout.connect(self.auto_save_tick)
+        self.auto_save_timer.start()
 
         threading.Thread(target=self.reminder_worker, daemon=True).start()
         threading.Thread(target=self.auto_keep_worker, daemon=True).start()
@@ -653,14 +703,20 @@ class NotesHamzaStudio(QMainWindow):
         template = TRANSLATIONS.get(self.lang, TRANSLATIONS["ar"]).get(key, key)
         return template.format(**kwargs) if kwargs else template
 
+    def get_active_theme_cfg(self):
+        themes = get_page_themes(self.lang)
+        active_name = self.data.get("app_theme") or next(iter(themes.keys()))
+        return themes.get(active_name) or next(iter(themes.values()))
+
     def apply_language_direction(self):
         is_ar = self.lang == "ar"
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft if is_ar else Qt.LayoutDirection.LeftToRight)
+        theme_cfg = self.get_active_theme_cfg()
         if QApplication.instance():
             QApplication.instance().setLayoutDirection(
                 Qt.LayoutDirection.RightToLeft if is_ar else Qt.LayoutDirection.LeftToRight
             )
-            QApplication.instance().setStyleSheet(get_stylesheet(self.lang))
+            QApplication.instance().setStyleSheet(get_stylesheet(self.lang, theme_cfg))
         self.setWindowTitle(self.tr("app_title"))
 
     def set_status(self, msg, timeout=4000):
@@ -671,6 +727,7 @@ class NotesHamzaStudio(QMainWindow):
         default_t = TRANSLATIONS["ar"]
         default_data = {
             "language": "ar",
+            "app_theme": default_t["theme_dark"],
             "keep": {
                 "email": "",
                 "master_token": "",
@@ -702,6 +759,7 @@ class NotesHamzaStudio(QMainWindow):
                     if isinstance(loaded, dict) and "notes" in loaded:
                         loaded.setdefault("keep", default_data["keep"])
                         loaded.setdefault("language", "ar")
+                        loaded.setdefault("app_theme", default_t["theme_dark"])
                         return loaded
             except Exception:
                 pass
@@ -709,8 +767,27 @@ class NotesHamzaStudio(QMainWindow):
 
     def save_data(self):
         self.data["language"] = self.lang
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
+        tmp_file = f"{DATA_FILE}.tmp"
+        with open(tmp_file, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=4)
+        os.replace(tmp_file, DATA_FILE)
+
+    def auto_save_tick(self):
+        note = self.get_current_note()
+        if note and hasattr(self, "title_edit") and hasattr(self, "editor"):
+            note["title"] = self.title_edit.text()
+            note["category"] = self.cat_combo.currentData() or "Projects"
+            note["content"] = self.editor.toPlainText()
+            note["html"] = self.editor.toHtml()
+            note["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        self.save_data()
+
+    def closeEvent(self, event):
+        try:
+            self.auto_save_tick()
+        except Exception:
+            pass
+        event.accept()
 
     def change_language(self, lang_code):
         if lang_code not in TRANSLATIONS or lang_code == self.lang:
@@ -735,28 +812,34 @@ class NotesHamzaStudio(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(True)
+        root_layout.addWidget(splitter)
+
         # 1) القائمة الجانبية
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(235)
+        sidebar.setMinimumWidth(140)
         side_lay = QVBoxLayout(sidebar)
-        side_lay.setContentsMargins(14, 18, 14, 18)
-        side_lay.setSpacing(6)
+        side_lay.setContentsMargins(10, 14, 10, 14)
+        side_lay.setSpacing(5)
 
         brand_box = QVBoxLayout()
-        brand_box.setContentsMargins(6, 0, 6, 8)
+        brand_box.setContentsMargins(4, 0, 4, 6)
         title_lbl = QLabel(self.tr("app_title"))
         title_lbl.setObjectName("BrandTitle")
+        title_lbl.setWordWrap(True)
         sub_lbl = QLabel(self.tr("brand_sub"))
         sub_lbl.setObjectName("BrandSub")
+        sub_lbl.setWordWrap(True)
         brand_box.addWidget(title_lbl)
         brand_box.addWidget(sub_lbl)
         side_lay.addLayout(brand_box)
 
         lang_row = QHBoxLayout()
-        lang_row.setSpacing(6)
+        lang_row.setSpacing(4)
         lang_lbl = QLabel(self.tr("lang_label"))
-        lang_lbl.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        lang_lbl.setStyleSheet("font-size: 12px;")
         self.lang_combo = QComboBox()
         self.lang_combo.addItem(self.tr("lang_ar"), "ar")
         self.lang_combo.addItem(self.tr("lang_en"), "en")
@@ -821,7 +904,8 @@ class NotesHamzaStudio(QMainWindow):
         side_lay.addWidget(self.keep_settings_btn)
 
         self.keep_status_lbl = QLabel(self.data.get("keep", {}).get("last_sync") or self.tr("keep_not_synced"))
-        self.keep_status_lbl.setStyleSheet("color: #64748B; font-size: 11px;")
+        self.keep_status_lbl.setStyleSheet("font-size: 11px;")
+        self.keep_status_lbl.setWordWrap(True)
         self.keep_status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         side_lay.addWidget(self.keep_status_lbl)
 
@@ -844,15 +928,15 @@ class NotesHamzaStudio(QMainWindow):
         export_btn.clicked.connect(self.export_current_note)
         side_lay.addWidget(export_btn)
 
-        root_layout.addWidget(sidebar)
+        splitter.addWidget(sidebar)
 
         # 2) قائمة الملاحظات
         list_panel = QFrame()
         list_panel.setObjectName("NotesListPanel")
-        list_panel.setFixedWidth(290)
+        list_panel.setMinimumWidth(150)
         list_lay = QVBoxLayout(list_panel)
-        list_lay.setContentsMargins(12, 16, 12, 14)
-        list_lay.setSpacing(10)
+        list_lay.setContentsMargins(10, 14, 10, 12)
+        list_lay.setSpacing(8)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.tr("search_placeholder"))
@@ -863,19 +947,22 @@ class NotesHamzaStudio(QMainWindow):
         self.notes_list.currentItemChanged.connect(self.on_note_selected)
         list_lay.addWidget(self.notes_list)
 
-        root_layout.addWidget(list_panel)
+        splitter.addWidget(list_panel)
 
         # 3) منطقة المحرر
         editor_panel = QFrame()
         editor_panel.setObjectName("EditorContainer")
+        editor_panel.setMinimumWidth(220)
         ed_lay = QVBoxLayout(editor_panel)
-        ed_lay.setContentsMargins(18, 16, 18, 14)
-        ed_lay.setSpacing(10)
+        ed_lay.setContentsMargins(14, 12, 14, 10)
+        ed_lay.setSpacing(8)
 
         top_bar = QHBoxLayout()
+        top_bar.setSpacing(6)
         self.title_edit = QLineEdit()
         self.title_edit.setObjectName("NoteTitleEdit")
         self.title_edit.setPlaceholderText(self.tr("title_placeholder"))
+        self.title_edit.setMinimumWidth(90)
         self.title_edit.textChanged.connect(self.on_note_edited)
         top_bar.addWidget(self.title_edit, 1)
 
@@ -933,11 +1020,12 @@ class NotesHamzaStudio(QMainWindow):
         toolbar_card = QFrame()
         toolbar_card.setObjectName("ToolbarCard")
         tb_lay = QHBoxLayout(toolbar_card)
-        tb_lay.setContentsMargins(10, 7, 10, 7)
-        tb_lay.setSpacing(6)
+        tb_lay.setContentsMargins(8, 6, 8, 6)
+        tb_lay.setSpacing(4)
 
         self.font_combo = QFontComboBox()
-        self.font_combo.setMaximumWidth(155)
+        self.font_combo.setMinimumWidth(85)
+        self.font_combo.setMaximumWidth(150)
         self.font_combo.currentFontChanged.connect(lambda f: self.editor.setCurrentFont(f))
         tb_lay.addWidget(self.font_combo)
 
@@ -945,13 +1033,18 @@ class NotesHamzaStudio(QMainWindow):
         for sz in ["11", "12", "14", "16", "18", "22", "26"]:
             self.size_combo.addItem(sz)
         self.size_combo.setCurrentText("14")
-        self.size_combo.setMaximumWidth(65)
+        self.size_combo.setMaximumWidth(62)
         self.size_combo.currentTextChanged.connect(lambda s: self.editor.setFontPointSize(float(s)))
         tb_lay.addWidget(self.size_combo)
 
         self.theme_combo = QComboBox()
-        for t_name in get_page_themes(self.lang).keys():
+        themes = get_page_themes(self.lang)
+        for t_name in themes.keys():
             self.theme_combo.addItem(t_name)
+        active_theme_name = self.data.get("app_theme") or next(iter(themes.keys()))
+        t_idx = self.theme_combo.findText(active_theme_name)
+        if t_idx >= 0:
+            self.theme_combo.setCurrentIndex(t_idx)
         self.theme_combo.currentTextChanged.connect(self.apply_page_theme)
         tb_lay.addWidget(self.theme_combo)
 
@@ -1004,25 +1097,25 @@ class NotesHamzaStudio(QMainWindow):
         ed_lay.addWidget(self.editor, 1)
 
         self.stats_lbl = QLabel(self.tr("stats", words=0, chars=0))
-        self.stats_lbl.setStyleSheet("color: #64748B; font-size: 12px;")
+        self.stats_lbl.setStyleSheet("font-size: 12px;")
         ed_lay.addWidget(self.stats_lbl)
 
-        root_layout.addWidget(editor_panel, 1)
+        splitter.addWidget(editor_panel)
 
         # 4) لوحة المهام والتنبيهات
         tasks_panel = QFrame()
         tasks_panel.setObjectName("TasksPanel")
-        tasks_panel.setFixedWidth(300)
+        tasks_panel.setMinimumWidth(150)
         tasks_lay = QVBoxLayout(tasks_panel)
-        tasks_lay.setContentsMargins(14, 16, 14, 14)
-        tasks_lay.setSpacing(10)
+        tasks_lay.setContentsMargins(10, 14, 10, 12)
+        tasks_lay.setSpacing(8)
 
         tasks_title = QLabel(self.tr("tasks_header"))
-        tasks_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
+        tasks_title.setStyleSheet("font-size: 15px; font-weight: 700;")
         tasks_lay.addWidget(tasks_title)
 
         self.progress_lbl = QLabel(self.tr("progress_zero"))
-        self.progress_lbl.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        self.progress_lbl.setStyleSheet("font-size: 12px;")
         tasks_lay.addWidget(self.progress_lbl)
 
         self.progress_bar = QProgressBar()
@@ -1036,9 +1129,10 @@ class NotesHamzaStudio(QMainWindow):
         tasks_lay.addWidget(self.task_input)
 
         rem_row = QHBoxLayout()
+        rem_row.setSpacing(4)
         self.reminder_input = QLineEdit()
         self.reminder_input.setPlaceholderText(self.tr("reminder_placeholder"))
-        self.reminder_input.setMaximumWidth(95)
+        self.reminder_input.setMaximumWidth(80)
         rem_row.addWidget(self.reminder_input)
 
         plus_15_btn = self.make_btn(self.tr("plus_15m"), prop_class="QuickTimeBtn")
@@ -1063,10 +1157,13 @@ class NotesHamzaStudio(QMainWindow):
         self.tasks_list = QListWidget()
         tasks_lay.addWidget(self.tasks_list, 1)
 
-        root_layout.addWidget(tasks_panel)
+        splitter.addWidget(tasks_panel)
+
+        splitter.setSizes([215, 250, 635, 260])
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
+        self.apply_page_theme(self.theme_combo.currentText(), announce=False, persist=False)
         self.set_status(self.tr("ready"), 2500)
 
     def get_current_note(self):
@@ -1179,11 +1276,11 @@ class NotesHamzaStudio(QMainWindow):
             self.cat_combo.setCurrentIndex(c_idx)
 
         themes = get_page_themes(self.lang)
-        t_name = note.get("theme") or next(iter(themes.keys()))
+        t_name = self.data.get("app_theme") or note.get("theme") or next(iter(themes.keys()))
         t_idx = self.theme_combo.findText(t_name)
         if t_idx >= 0:
             self.theme_combo.setCurrentIndex(t_idx)
-        self.apply_page_theme(self.theme_combo.currentText(), announce=False)
+        self.apply_page_theme(self.theme_combo.currentText(), announce=False, persist=False)
 
         if note.get("html"):
             self.editor.setHtml(note["html"])
@@ -1217,7 +1314,7 @@ class NotesHamzaStudio(QMainWindow):
     def create_new_note(self):
         new_id = str(int(time.time() * 1000))
         themes = get_page_themes(self.lang)
-        default_theme = next(iter(themes.keys()))
+        default_theme = self.data.get("app_theme") or next(iter(themes.keys()))
         cat = self.current_category if self.current_category in ("Projects", "Personal", "Work", "Ideas") else "Projects"
         note = {
             "id": new_id,
@@ -1290,15 +1387,21 @@ class NotesHamzaStudio(QMainWindow):
             self.refresh_notes_list()
             self.set_status(self.tr("status_deleted"))
 
-    def apply_page_theme(self, theme_name, announce=True):
+    def apply_page_theme(self, theme_name, announce=True, persist=True):
         themes = get_page_themes(self.lang)
         theme = themes.get(theme_name)
         if not theme:
             return
-        note = self.get_current_note()
-        if note:
-            note["theme"] = theme_name
+
+        if persist:
+            self.data["app_theme"] = theme_name
+            note = self.get_current_note()
+            if note:
+                note["theme"] = theme_name
             self.save_data()
+
+        if QApplication.instance():
+            QApplication.instance().setStyleSheet(get_stylesheet(self.lang, theme))
 
         bg = theme["bg"]
         fg = theme["fg"]
@@ -1405,7 +1508,7 @@ class NotesHamzaStudio(QMainWindow):
                 "category": "Projects",
                 "content": content,
                 "html": "",
-                "theme": next(iter(themes.keys())),
+                "theme": self.data.get("app_theme") or next(iter(themes.keys())),
                 "pinned": False,
                 "password": "",
                 "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1483,7 +1586,7 @@ class NotesHamzaStudio(QMainWindow):
 
             if t_item.get("reminder"):
                 rem_lbl = QLabel(f"⏰ {t_item['reminder']}")
-                rem_lbl.setStyleSheet("color: #93C5FD; font-size: 11px;")
+                rem_lbl.setStyleSheet("font-size: 11px;")
                 lay.addWidget(rem_lbl)
 
             del_btn = self.make_btn("", icon_name="fa5s.times", color="#F87171")
@@ -1619,7 +1722,7 @@ class NotesHamzaStudio(QMainWindow):
                         "category": "Personal",
                         "content": text,
                         "html": "",
-                        "theme": next(iter(themes.keys())),
+                        "theme": self.data.get("app_theme") or next(iter(themes.keys())),
                         "pinned": bool(getattr(gnote, "pinned", False)),
                         "password": "",
                         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
