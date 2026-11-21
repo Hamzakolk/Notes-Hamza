@@ -37,6 +37,17 @@ STORAGE_DIR = get_app_storage_dir()
 DATA_FILE = os.path.join(STORAGE_DIR, "notes_hamza_data.json")
 ICON_FILE = os.path.join(STORAGE_DIR, "icon.ico")
 
+
+def safe_icon(icon_name, color="#E2E8F0"):
+    try:
+        ico = qta.icon(icon_name, color=color)
+        if isinstance(ico, QIcon):
+            return ico
+    except Exception:
+        pass
+    return QIcon()
+
+
 TRANSLATIONS = {
     "ar": {
         "app_title": "Notes Hamza Studio",
@@ -624,6 +635,20 @@ class NotesHamzaStudio(QMainWindow):
         threading.Thread(target=self.reminder_worker, daemon=True).start()
         threading.Thread(target=self.auto_keep_worker, daemon=True).start()
 
+    def make_btn(self, text="", icon_name=None, color="#E2E8F0", obj_name=None, prop_class=None, tooltip=None):
+        btn = QPushButton(text)
+        if icon_name:
+            ico = safe_icon(icon_name, color=color)
+            if not ico.isNull():
+                btn.setIcon(ico)
+        if obj_name:
+            btn.setObjectName(obj_name)
+        if prop_class:
+            btn.setProperty("class", prop_class)
+        if tooltip:
+            btn.setToolTip(tooltip)
+        return btn
+
     def tr(self, key, **kwargs):
         template = TRANSLATIONS.get(self.lang, TRANSLATIONS["ar"]).get(key, key)
         return template.format(**kwargs) if kwargs else template
@@ -745,8 +770,12 @@ class NotesHamzaStudio(QMainWindow):
         lang_row.addWidget(self.lang_combo, 1)
         side_lay.addLayout(lang_row)
 
-        self.new_note_btn = QPushButton(qta.icon("fa5s.plus", color="#FFFFFF"), f"  {self.tr('new_note')}")
-        self.new_note_btn.setObjectName("PrimaryBtn")
+        self.new_note_btn = self.make_btn(
+            f"  {self.tr('new_note')}",
+            icon_name="fa5s.plus",
+            color="#FFFFFF",
+            obj_name="PrimaryBtn"
+        )
         self.new_note_btn.clicked.connect(self.create_new_note)
         side_lay.addWidget(self.new_note_btn)
 
@@ -760,8 +789,12 @@ class NotesHamzaStudio(QMainWindow):
             ("Ideas", "cat_ideas", "fa5s.lightbulb"),
         ]
         for cat_key, label_key, icon_name in categories:
-            btn = QPushButton(qta.icon(icon_name, color="#94A3B8"), f"  {self.tr(label_key)}")
-            btn.setProperty("class", "NavItem")
+            btn = self.make_btn(
+                f"  {self.tr(label_key)}",
+                icon_name=icon_name,
+                color="#94A3B8",
+                prop_class="NavItem"
+            )
             btn.setProperty("active", "true" if cat_key == self.current_category else "false")
             btn.clicked.connect(lambda _, c=cat_key: self.select_category(c))
             self.nav_buttons[cat_key] = btn
@@ -769,13 +802,21 @@ class NotesHamzaStudio(QMainWindow):
 
         side_lay.addStretch()
 
-        self.sync_btn = QPushButton(qta.icon("fa5s.sync", color="#818CF8"), f"  {self.tr('sync_keep')}")
-        self.sync_btn.setObjectName("SyncBtn")
+        self.sync_btn = self.make_btn(
+            f"  {self.tr('sync_keep')}",
+            icon_name="fa5s.sync",
+            color="#818CF8",
+            obj_name="SyncBtn"
+        )
         self.sync_btn.clicked.connect(self.start_keep_sync)
         side_lay.addWidget(self.sync_btn)
 
-        self.keep_settings_btn = QPushButton(qta.icon("fa5s.cog", color="#94A3B8"), f"  {self.tr('keep_settings')}")
-        self.keep_settings_btn.setProperty("class", "IconActionBtn")
+        self.keep_settings_btn = self.make_btn(
+            f"  {self.tr('keep_settings')}",
+            icon_name="fa5s.cog",
+            color="#94A3B8",
+            prop_class="IconActionBtn"
+        )
         self.keep_settings_btn.clicked.connect(self.open_keep_settings)
         side_lay.addWidget(self.keep_settings_btn)
 
@@ -784,14 +825,22 @@ class NotesHamzaStudio(QMainWindow):
         self.keep_status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         side_lay.addWidget(self.keep_status_lbl)
 
-        open_file_btn = QPushButton(qta.icon("fa5s.folder-open", color="#CBD5E1"), f"  {self.tr('open_file')}")
-        open_file_btn.setProperty("class", "IconActionBtn")
-        open_file_btn.setToolTip(self.tr("open_file_tip"))
+        open_file_btn = self.make_btn(
+            f"  {self.tr('open_file')}",
+            icon_name="fa5s.folder-open",
+            color="#CBD5E1",
+            prop_class="IconActionBtn",
+            tooltip=self.tr("open_file_tip")
+        )
         open_file_btn.clicked.connect(self.open_external_file)
         side_lay.addWidget(open_file_btn)
 
-        export_btn = QPushButton(qta.icon("fa5s.file-export", color="#CBD5E1"), f"  {self.tr('export_note')}")
-        export_btn.setProperty("class", "IconActionBtn")
+        export_btn = self.make_btn(
+            f"  {self.tr('export_note')}",
+            icon_name="fa5s.file-export",
+            color="#CBD5E1",
+            prop_class="IconActionBtn"
+        )
         export_btn.clicked.connect(self.export_current_note)
         side_lay.addWidget(export_btn)
 
@@ -841,25 +890,41 @@ class NotesHamzaStudio(QMainWindow):
         self.cat_combo.currentIndexChanged.connect(self.on_note_edited)
         top_bar.addWidget(self.cat_combo)
 
-        self.float_btn = QPushButton(qta.icon("fa5s.external-link-alt", color="#93C5FD"), f" {self.tr('floating')}")
-        self.float_btn.setProperty("class", "IconActionBtn")
-        self.float_btn.setToolTip(self.tr("floating_tip"))
+        self.float_btn = self.make_btn(
+            f" {self.tr('floating')}",
+            icon_name="fa5s.external-link-alt",
+            color="#93C5FD",
+            prop_class="IconActionBtn",
+            tooltip=self.tr("floating_tip")
+        )
         self.float_btn.clicked.connect(self.open_floating_note)
         top_bar.addWidget(self.float_btn)
 
-        self.pin_btn = QPushButton(qta.icon("fa5s.thumbtack", color="#FBBF24"), f" {self.tr('pin')}")
-        self.pin_btn.setProperty("class", "IconActionBtn")
+        self.pin_btn = self.make_btn(
+            f" {self.tr('pin')}",
+            icon_name="fa5s.thumbtack",
+            color="#FBBF24",
+            prop_class="IconActionBtn"
+        )
         self.pin_btn.clicked.connect(self.toggle_pin)
         top_bar.addWidget(self.pin_btn)
 
-        self.lock_btn = QPushButton(qta.icon("fa5s.lock", color="#F87171"), f" {self.tr('lock')}")
-        self.lock_btn.setProperty("class", "IconActionBtn")
+        self.lock_btn = self.make_btn(
+            f" {self.tr('lock')}",
+            icon_name="fa5s.lock",
+            color="#F87171",
+            prop_class="IconActionBtn"
+        )
         self.lock_btn.clicked.connect(self.toggle_lock)
         top_bar.addWidget(self.lock_btn)
 
-        del_btn = QPushButton(qta.icon("fa5s.trash-alt", color="#EF4444"))
-        del_btn.setProperty("class", "IconActionBtn")
-        del_btn.setToolTip(self.tr("delete_tip"))
+        del_btn = self.make_btn(
+            "",
+            icon_name="fa5s.trash-alt",
+            color="#EF4444",
+            prop_class="IconActionBtn",
+            tooltip=self.tr("delete_tip")
+        )
         del_btn.clicked.connect(self.delete_current_note)
         top_bar.addWidget(del_btn)
 
@@ -890,63 +955,43 @@ class NotesHamzaStudio(QMainWindow):
         self.theme_combo.currentTextChanged.connect(self.apply_page_theme)
         tb_lay.addWidget(self.theme_combo)
 
-        bold_btn = QPushButton(qta.icon("fa5s.bold", color="#E2E8F0"))
-        bold_btn.setProperty("class", "IconActionBtn")
-        bold_btn.setToolTip(self.tr("bold_tip"))
+        bold_btn = self.make_btn("", icon_name="fa5s.bold", color="#E2E8F0", prop_class="IconActionBtn", tooltip=self.tr("bold_tip"))
         bold_btn.clicked.connect(self.toggle_bold)
         tb_lay.addWidget(bold_btn)
 
-        italic_btn = QPushButton(qta.icon("fa5s.italic", color="#E2E8F0"))
-        italic_btn.setProperty("class", "IconActionBtn")
-        italic_btn.setToolTip(self.tr("italic_tip"))
+        italic_btn = self.make_btn("", icon_name="fa5s.italic", color="#E2E8F0", prop_class="IconActionBtn", tooltip=self.tr("italic_tip"))
         italic_btn.clicked.connect(self.toggle_italic)
         tb_lay.addWidget(italic_btn)
 
-        underline_btn = QPushButton(qta.icon("fa5s.underline", color="#E2E8F0"))
-        underline_btn.setProperty("class", "IconActionBtn")
-        underline_btn.setToolTip(self.tr("underline_tip"))
+        underline_btn = self.make_btn("", icon_name="fa5s.underline", color="#E2E8F0", prop_class="IconActionBtn", tooltip=self.tr("underline_tip"))
         underline_btn.clicked.connect(self.toggle_underline)
         tb_lay.addWidget(underline_btn)
 
-        color_btn = QPushButton(qta.icon("fa5s.palette", color="#38BDF8"))
-        color_btn.setProperty("class", "IconActionBtn")
-        color_btn.setToolTip(self.tr("text_color_tip"))
+        color_btn = self.make_btn("", icon_name="fa5s.palette", color="#38BDF8", prop_class="IconActionBtn", tooltip=self.tr("text_color_tip"))
         color_btn.clicked.connect(self.choose_text_color)
         tb_lay.addWidget(color_btn)
 
-        hi_btn = QPushButton(qta.icon("fa5s.highlighter", color="#FACC15"))
-        hi_btn.setProperty("class", "IconActionBtn")
-        hi_btn.setToolTip(self.tr("highlight_tip"))
+        hi_btn = self.make_btn("", icon_name="fa5s.highlighter", color="#FACC15", prop_class="IconActionBtn", tooltip=self.tr("highlight_tip"))
         hi_btn.clicked.connect(self.choose_highlight_color)
         tb_lay.addWidget(hi_btn)
 
-        bullet_btn = QPushButton(qta.icon("fa5s.list-ul", color="#CBD5E1"))
-        bullet_btn.setProperty("class", "IconActionBtn")
-        bullet_btn.setToolTip(self.tr("bullet_tip"))
+        bullet_btn = self.make_btn("", icon_name="fa5s.list-ul", color="#CBD5E1", prop_class="IconActionBtn", tooltip=self.tr("bullet_tip"))
         bullet_btn.clicked.connect(self.insert_bullet_list)
         tb_lay.addWidget(bullet_btn)
 
-        align_r_btn = QPushButton(qta.icon("fa5s.align-right", color="#CBD5E1"))
-        align_r_btn.setProperty("class", "IconActionBtn")
-        align_r_btn.setToolTip(self.tr("align_right_tip"))
+        align_r_btn = self.make_btn("", icon_name="fa5s.align-right", color="#CBD5E1", prop_class="IconActionBtn", tooltip=self.tr("align_right_tip"))
         align_r_btn.clicked.connect(lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignRight))
         tb_lay.addWidget(align_r_btn)
 
-        align_l_btn = QPushButton(qta.icon("fa5s.align-left", color="#CBD5E1"))
-        align_l_btn.setProperty("class", "IconActionBtn")
-        align_l_btn.setToolTip(self.tr("align_left_tip"))
+        align_l_btn = self.make_btn("", icon_name="fa5s.align-left", color="#CBD5E1", prop_class="IconActionBtn", tooltip=self.tr("align_left_tip"))
         align_l_btn.clicked.connect(lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignLeft))
         tb_lay.addWidget(align_l_btn)
 
-        sel_all_btn = QPushButton(qta.icon("fa5s.check-double", color="#A5B4FC"))
-        sel_all_btn.setProperty("class", "IconActionBtn")
-        sel_all_btn.setToolTip(self.tr("select_all_tip"))
+        sel_all_btn = self.make_btn("", icon_name="fa5s.check-double", color="#A5B4FC", prop_class="IconActionBtn", tooltip=self.tr("select_all_tip"))
         sel_all_btn.clicked.connect(self.select_all_editor)
         tb_lay.addWidget(sel_all_btn)
 
-        copy_all_btn = QPushButton(qta.icon("fa5s.copy", color="#34D399"))
-        copy_all_btn.setProperty("class", "IconActionBtn")
-        copy_all_btn.setToolTip(self.tr("copy_all_tip"))
+        copy_all_btn = self.make_btn("", icon_name="fa5s.copy", color="#34D399", prop_class="IconActionBtn", tooltip=self.tr("copy_all_tip"))
         copy_all_btn.clicked.connect(self.copy_all_editor)
         tb_lay.addWidget(copy_all_btn)
 
@@ -996,20 +1041,22 @@ class NotesHamzaStudio(QMainWindow):
         self.reminder_input.setMaximumWidth(95)
         rem_row.addWidget(self.reminder_input)
 
-        plus_15_btn = QPushButton(self.tr("plus_15m"))
-        plus_15_btn.setProperty("class", "QuickTimeBtn")
+        plus_15_btn = self.make_btn(self.tr("plus_15m"), prop_class="QuickTimeBtn")
         plus_15_btn.clicked.connect(lambda: self.set_quick_reminder(15))
         rem_row.addWidget(plus_15_btn)
 
-        plus_1h_btn = QPushButton(self.tr("plus_1h"))
-        plus_1h_btn.setProperty("class", "QuickTimeBtn")
+        plus_1h_btn = self.make_btn(self.tr("plus_1h"), prop_class="QuickTimeBtn")
         plus_1h_btn.clicked.connect(lambda: self.set_quick_reminder(60))
         rem_row.addWidget(plus_1h_btn)
 
         tasks_lay.addLayout(rem_row)
 
-        add_task_btn = QPushButton(qta.icon("fa5s.plus-circle", color="#FFFFFF"), f"  {self.tr('add_task')}")
-        add_task_btn.setObjectName("PrimaryBtn")
+        add_task_btn = self.make_btn(
+            f"  {self.tr('add_task')}",
+            icon_name="fa5s.plus-circle",
+            color="#FFFFFF",
+            obj_name="PrimaryBtn"
+        )
         add_task_btn.clicked.connect(self.add_task)
         tasks_lay.addWidget(add_task_btn)
 
@@ -1439,7 +1486,7 @@ class NotesHamzaStudio(QMainWindow):
                 rem_lbl.setStyleSheet("color: #93C5FD; font-size: 11px;")
                 lay.addWidget(rem_lbl)
 
-            del_btn = QPushButton(qta.icon("fa5s.times", color="#F87171"))
+            del_btn = self.make_btn("", icon_name="fa5s.times", color="#F87171")
             del_btn.setFixedSize(24, 24)
             del_btn.setStyleSheet("background: transparent; border: none;")
             del_btn.clicked.connect(lambda _, i=idx: self.delete_task(i))
